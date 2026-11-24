@@ -10,9 +10,8 @@ class AppConstants {
   /// flutter build web --release --dart-define=API_BASE_URL=https://your-api.vercel.app/api
   static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-  /// Optional fallback production URL (update this once you deploy your Backend to Vercel
-  /// if you don't want to pass --dart-define every time).
-  static const String defaultProdBaseUrl = '';
+  /// Default production URL pointing to your live Vercel backend
+  static const String defaultProdBaseUrl = 'https://cricyy.vercel.app/api';
 
   static String? _customOverrideUrl;
 
