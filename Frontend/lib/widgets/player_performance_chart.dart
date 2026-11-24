@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../core/app_spacing.dart';
 import '../services/player_stats_aggregator.dart';
+import 'neo_card.dart';
 
 enum ChartMode { batting, bowling }
 
@@ -27,22 +28,18 @@ class _PlayerPerformanceChartState extends State<PlayerPerformanceChart> {
     final hasBowlingData = widget.performances.any((p) => p.didBowl);
 
     if (!hasBattingData && !hasBowlingData) {
-      return Container(
+      return NeoCard(
+        style: NeoStyle.inset,
         height: 140,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppRadius.rLG,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.bar_chart, size: 36, color: AppColors.textHint),
-            const SizedBox(height: 8),
-            Text('No match performance data to chart yet.', style: AppTextStyles.body2),
-          ],
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.bar_chart_rounded, size: 36, color: AppColors.textHint),
+              const SizedBox(height: 8),
+              Text('No match performance data to chart yet.', style: AppTextStyles.body2),
+            ],
+          ),
         ),
       );
     }
@@ -66,24 +63,26 @@ class _PlayerPerformanceChartState extends State<PlayerPerformanceChart> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Mode Selector Bar
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runSpacing: 8,
+          spacing: 8,
           children: [
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.show_chart, size: 18, color: AppColors.primary),
+                const Icon(Icons.bar_chart_rounded, size: 18, color: AppColors.primary),
                 const SizedBox(width: 6),
-                Text('Performance Trends', style: AppTextStyles.headline3.copyWith(fontSize: 16)),
+                Text('Performance Graph', style: AppTextStyles.headline3.copyWith(fontSize: 16)),
               ],
             ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: AppRadius.rFull,
-                border: Border.all(color: AppColors.border),
-              ),
+            NeoCard(
+              style: NeoStyle.inset,
+              borderRadius: 100,
+              padding: const EdgeInsets.all(3),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _modeButton('Batting (Runs)', ChartMode.batting, _mode == ChartMode.batting),
                   _modeButton('Bowling (Wkts)', ChartMode.bowling, _mode == ChartMode.bowling),
@@ -95,24 +94,19 @@ class _PlayerPerformanceChartState extends State<PlayerPerformanceChart> {
         AppSpacing.vGap(AppSpacing.sm),
 
         // Visual Canvas Bar Chart
-        Container(
-          height: 190,
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: AppRadius.rLG,
-            border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+        NeoCard(
+          height: 205,
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
           child: _mode == ChartMode.batting
               ? _buildBattingChart(battingList)
               : _buildBowlingChart(bowlingList),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            'Tap any bar to inspect match details',
+            style: AppTextStyles.caption.copyWith(fontSize: 10),
+          ),
         ),
 
         // Selected Performance Inspection Card
@@ -130,17 +124,27 @@ class _PlayerPerformanceChartState extends State<PlayerPerformanceChart> {
         _mode = mode;
         _selectedIndex = null;
       }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: AppRadius.rFull,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    offset: const Offset(0, 2),
+                    blurRadius: 6,
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: AppTextStyles.caption.copyWith(
             color: selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             fontSize: 11,
           ),
         ),
@@ -365,19 +369,16 @@ class _PlayerPerformanceChartState extends State<PlayerPerformanceChart> {
 
   Widget _buildSelectedInspectionCard(PlayerMatchPerformance p) {
     final dateStr = '${p.matchDate.day}/${p.matchDate.month}/${p.matchDate.year}';
-    return Container(
+    return NeoCard(
+      style: NeoStyle.inset,
+      borderRadius: 14,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: AppRadius.rMD,
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppColors.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(

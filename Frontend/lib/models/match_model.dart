@@ -72,6 +72,8 @@ class MatchModel {
   final MatchRules rules;
   final InningsModel? innings1;
   final InningsModel? innings2;
+  final DateTime? updatedAt;
+  final int syncVersion;
 
   const MatchModel({
     required this.id,
@@ -89,6 +91,8 @@ class MatchModel {
     required this.rules,
     this.innings1,
     this.innings2,
+    this.updatedAt,
+    this.syncVersion = 1,
   });
 
   bool get isLive => status == 'in_progress';
@@ -110,6 +114,8 @@ class MatchModel {
     MatchRules? rules,
     InningsModel? innings1,
     InningsModel? innings2,
+    DateTime? updatedAt,
+    int? syncVersion,
   }) {
     return MatchModel(
       id: id ?? this.id,
@@ -127,6 +133,8 @@ class MatchModel {
       rules: rules ?? this.rules,
       innings1: innings1 ?? this.innings1,
       innings2: innings2 ?? this.innings2,
+      updatedAt: updatedAt ?? this.updatedAt,
+      syncVersion: syncVersion ?? this.syncVersion,
     );
   }
 
@@ -139,13 +147,15 @@ class MatchModel {
     format:      json['format'] ?? '',
     totalOvers:  json['totalOvers'] ?? 20,
     status:      json['status'] ?? 'setup',
-    matchDate:   DateTime.tryParse(json['matchDate'] ?? '') ?? DateTime.now(),
+    matchDate:   DateTime.tryParse(json['matchDate']?.toString() ?? '') ?? DateTime.now(),
     venue:       json['venue'],
-    result:      json['result'] != null ? MatchResult.fromJson(json['result']) : null,
-    toss:        json['toss']   != null ? TossInfo.fromJson(json['toss'])     : null,
-    rules:       MatchRules.fromJson(json['rules'] ?? {}),
-    innings1:    json['innings1'] != null ? InningsModel.fromJson(json['innings1']) : null,
-    innings2:    json['innings2'] != null ? InningsModel.fromJson(json['innings2']) : null,
+    result:      json['result'] != null ? MatchResult.fromJson(Map<String, dynamic>.from(json['result'])) : null,
+    toss:        json['toss']   != null ? TossInfo.fromJson(Map<String, dynamic>.from(json['toss']))     : null,
+    rules:       MatchRules.fromJson(json['rules'] != null ? Map<String, dynamic>.from(json['rules']) : {}),
+    innings1:    json['innings1'] != null ? InningsModel.fromJson(Map<String, dynamic>.from(json['innings1'])) : null,
+    innings2:    json['innings2'] != null ? InningsModel.fromJson(Map<String, dynamic>.from(json['innings2'])) : null,
+    updatedAt:   json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
+    syncVersion: json['syncVersion'] ?? 1,
   );
 
   Map<String, dynamic> toJson() => {
@@ -164,6 +174,8 @@ class MatchModel {
     'rules': rules.toJson(),
     if (innings1 != null) 'innings1': innings1!.toJson(),
     if (innings2 != null) 'innings2': innings2!.toJson(),
+    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'syncVersion': syncVersion,
   };
 }
 

@@ -22,6 +22,7 @@
 - [Key Features](#key-features)
 - [Architecture & Project Structure](#architecture--project-structure)
 - [Getting Started](#getting-started)
+- [Free Cloud Deployment (Vercel + MongoDB Atlas)](#free-cloud-deployment-vercel--mongodb-atlas)
 - [API Overview](#api-overview)
 - [Running Tests](#running-tests)
 
@@ -73,8 +74,12 @@
 - **Zero Dummy Data**: Players are automatically extracted and aggregated from real created matches.
 - **Search & Sort Directory**: Filter players by name and sort by **Most Runs**, **Most Wickets**, **Matches**, or **Name (A–Z)**.
 - **Interactive Performance Trends (`PlayerPerformanceChart`)**:
-  - Tap any player in the **Players** directory, **Live Scoring**, or **Full Scorecard** to open a quick-view sheet or full career profile.
-  - Toggle between **Batting (Runs)** and **Bowling (Wickets)** bar charts and tap any match bar to inspect opponent, date, strike rate, boundaries, and economy.
+  - Tap any player name or **Graph** button in the **Players** directory, **Live Scoring**, or **Full Scorecard** to inspect their interactive **Batting (Runs)** and **Bowling (Wickets)** bar graph or open their full career profile.
+  - Tap any match bar inside the chart to inspect opponent, date, strike rate, boundaries, and economy.
+
+### 5. Minimalistic Neomorphism UI & Multi-User Real-Time Sync
+- **Minimalistic Neomorphism Design**: Soft tactile shadows (`NeoCard`, `NeoIconButton`, `NeoPillButton`, animated scoring buttons) with responsive wide-screen centering across mobile & web.
+- **Shared Cloud Matches + Auto-Refresh (5s)**: Matches created or scored by any user sync automatically to MongoDB Atlas (`/api/shared-matches`), with an automatic **5-second live refresh**, **pull-to-refresh**, **manual refresh button**, and an in-app **Cloud Sync Settings** modal.
 
 ---
 
@@ -174,13 +179,22 @@ flutter run -d chrome --web-port 3000 --web-hostname localhost
 
 ---
 
+## Free Cloud Deployment (Vercel + MongoDB Atlas)
+
+Deploy both the Express API and Flutter Web frontend for **free** using **Vercel Hobby** + **MongoDB Atlas M0 (512 MB)**:
+
+👉 See the complete step-by-step instructions in [VERCEL_DEPLOYMENT_GUIDE.md](./VERCEL_DEPLOYMENT_GUIDE.md).
+
+---
+
 ## API Overview
 
 All scoring calculations on the server live under `Backend/services/` and expose REST endpoints under `/api`:
 
 | Resource | Base Endpoint | Capabilities |
 | :--- | :--- | :--- |
-| **Health** | `/api/health` | Server health verification |
+| **Health** | `/api/health` | Server & MongoDB connection verification |
+| **Shared Matches** | `/api/shared-matches` | Multi-user live match sync, create/update/fetch across devices |
 | **Players** | `/api/players` | CRUD, career statistics, match-by-match history |
 | **Teams** | `/api/teams` | Team CRUD and roster member management |
 | **Matches** | `/api/matches` | Create match, manage innings, record/correct/undo deliveries, scorecard, complete match |

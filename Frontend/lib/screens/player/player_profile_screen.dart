@@ -9,6 +9,7 @@ import '../../providers/player_provider.dart';
 import '../../models/player_model.dart';
 import '../../services/player_stats_aggregator.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/neo_card.dart';
 import '../../widgets/player_avatar.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/player_performance_chart.dart';
@@ -86,45 +87,50 @@ class _PlayerProfileScreenState extends State<PlayerProfileScreen>
         final performances = profile.matchPerformances;
 
         return Scaffold(
-          backgroundColor: AppColors.background,
-          body: NestedScrollView(
-            headerSliverBuilder: (context, _) => [
-              _ProfileSliverAppBar(
-                player: player,
-                batting: batting,
-                bowling: bowling,
-              ),
-              SliverPersistentHeader(
-                delegate: _TabBarDelegate(
-                  TabBar(
-                    controller: _tab,
-                    tabs: const [
-                      Tab(text: 'Overview'),
-                      Tab(text: 'Batting'),
-                      Tab(text: 'Bowling'),
-                    ],
+          backgroundColor: AppColors.neoBackground,
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 820),
+              child: NestedScrollView(
+                headerSliverBuilder: (context, _) => [
+                  _ProfileSliverAppBar(
+                    player: player,
+                    batting: batting,
+                    bowling: bowling,
                   ),
+                  SliverPersistentHeader(
+                    delegate: _TabBarDelegate(
+                      TabBar(
+                        controller: _tab,
+                        tabs: const [
+                          Tab(text: 'Overview'),
+                          Tab(text: 'Batting'),
+                          Tab(text: 'Bowling'),
+                        ],
+                      ),
+                    ),
+                    pinned: true,
+                  ),
+                ],
+                body: TabBarView(
+                  controller: _tab,
+                  children: [
+                    _OverviewTab(
+                      batting: batting,
+                      bowling: bowling,
+                      performances: performances,
+                    ),
+                    _BattingTab(
+                      stats: batting,
+                      performances: performances,
+                    ),
+                    _BowlingTab(
+                      stats: bowling,
+                      performances: performances,
+                    ),
+                  ],
                 ),
-                pinned: true,
               ),
-            ],
-            body: TabBarView(
-              controller: _tab,
-              children: [
-                _OverviewTab(
-                  batting: batting,
-                  bowling: bowling,
-                  performances: performances,
-                ),
-                _BattingTab(
-                  stats: batting,
-                  performances: performances,
-                ),
-                _BowlingTab(
-                  stats: bowling,
-                  performances: performances,
-                ),
-              ],
             ),
           ),
         );
@@ -160,10 +166,10 @@ class _ProfileSliverAppBar extends StatelessWidget {
     return SliverAppBar(
       expandedHeight: 180,
       pinned: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.neoBackground,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          color: AppColors.surface,
+          color: AppColors.neoBackground,
           padding: const EdgeInsets.fromLTRB(20, 70, 20, 16),
           child: Row(
             children: [
@@ -238,9 +244,12 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: AppColors.surface,
+      color: AppColors.neoBackground,
       child: Column(
-        children: [tabBar, const Divider(height: 1)],
+        children: [
+          tabBar,
+          Divider(height: 1, color: AppColors.neoShadowDark.withValues(alpha: 0.3)),
+        ],
       ),
     );
   }

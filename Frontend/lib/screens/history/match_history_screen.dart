@@ -9,7 +9,9 @@ import '../../core/app_constants.dart';
 import '../../providers/match_provider.dart';
 import '../../models/match_model.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/sync_controls.dart';
 
 class MatchHistoryScreen extends StatefulWidget {
   const MatchHistoryScreen({super.key});
@@ -27,39 +29,59 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MatchProvider>().loadMatches();
+      context.read<MatchProvider>().refreshMatches(silent: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.neoBackground,
       appBar: AppBar(
         title: const Text('Match History'),
-        actions: [
-          IconButton(icon: const Icon(Icons.tune_outlined), onPressed: () {}),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: SyncActionControls(compact: true),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildFilterChips(),
-          Expanded(child: _buildList()),
-        ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 820),
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              _buildFilterChips(),
+              Expanded(child: _buildList()),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: TextField(
-        controller: _searchCtrl,
-        onChanged: (v) => setState(() => _query = v.toLowerCase()),
-        decoration: const InputDecoration(
-          hintText: 'Search by team name...',
-          prefixIcon: Icon(Icons.search, size: 20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: NeoCard(
+        style: NeoStyle.inset,
+        borderRadius: 16,
+        padding: EdgeInsets.zero,
+        child: TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+          decoration: const InputDecoration(
+            hintText: 'Search by team name...',
+            filled: false,
+            prefixIcon: Icon(Icons.search_rounded, size: 20),
+          ),
         ),
       ),
     );
@@ -69,12 +91,12 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
     final filters = ['all', 'in_progress', 'completed'];
     final labels  = {'all': 'All', 'in_progress': 'Live', 'completed': 'Completed'};
     return SizedBox(
-      height: 44,
+      height: 46,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         children: filters.map((f) => Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: 10),
           child: FormatChip(
             label: labels[f]!,
             selected: _status == f,
@@ -88,7 +110,9 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
   Widget _buildList() {
     return Consumer<MatchProvider>(
       builder: (context, prov, _) {
-        if (prov.isLoading) return const Center(child: CircularProgressIndicator());
+        if (prov.isLoading && prov.matches.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         var matches = prov.matches;
         if (_status != 'all') matches = matches.where((m) => m.status == _status).toList();
@@ -98,26 +122,35 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
             m.team2Name.toLowerCase().contains(_query)).toList();
         }
 
-        if (matches.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.history, size: 56, color: AppColors.textHint),
-                AppSpacing.vGap(AppSpacing.base),
-                Text('No matches found', style: AppTextStyles.bodyBold),
-                AppSpacing.vGap(AppSpacing.xs),
-                Text('Try a different search or filter', style: AppTextStyles.body2),
-              ],
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: AppSpacing.pagePadding.copyWith(top: 12),
-          itemCount: matches.length,
-          separatorBuilder: (_, _) => AppSpacing.vGap(AppSpacing.sm),
-          itemBuilder: (_, i) => _MatchHistoryCard(match: matches[i]),
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () => prov.refreshMatches(silent: false),
+          child: matches.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    const SizedBox(height: 100),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.history_rounded, size: 56, color: AppColors.textHint),
+                          AppSpacing.vGap(AppSpacing.base),
+                          Text('No matches found', style: AppTextStyles.bodyBold),
+                          AppSpacing.vGap(AppSpacing.xs),
+                          Text('Try a different search or pull down to refresh', style: AppTextStyles.body2),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: AppSpacing.pagePadding.copyWith(top: 12),
+                  itemCount: matches.length,
+                  separatorBuilder: (_, _) => AppSpacing.vGap(AppSpacing.md),
+                  itemBuilder: (_, i) => _MatchHistoryCard(match: matches[i]),
+                ),
         );
       },
     );
@@ -132,18 +165,23 @@ class _MatchHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       padding: EdgeInsets.zero,
-      onTap: () => Navigator.pushNamed(context,
-          match.isLive ? AppConstants.routeLiveScoring : AppConstants.routeScorecard,
-          arguments: match),
+      onTap: () {
+        context.read<MatchProvider>().selectMatch(match);
+        Navigator.pushNamed(context,
+            match.isLive ? AppConstants.routeLiveScoring : AppConstants.routeScorecard,
+            arguments: match);
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: match.isLive ? AppColors.primary : AppColors.surfaceVariant,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              gradient: match.isLive
+                  ? const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark])
+                  : null,
+              color: match.isLive ? null : AppColors.neoPressed,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Row(
               children: [
@@ -159,7 +197,7 @@ class _MatchHistoryCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: match.isLive ? Colors.white.withOpacity(0.2) : AppColors.primaryLight,
+                    color: match.isLive ? Colors.white.withValues(alpha: 0.2) : AppColors.primaryLight,
                     borderRadius: AppRadius.rFull,
                   ),
                   child: Text(match.format,
@@ -174,7 +212,6 @@ class _MatchHistoryCard extends StatelessWidget {
               ],
             ),
           ),
-          // Body
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -205,27 +242,32 @@ class _MatchHistoryCard extends StatelessWidget {
                     child: Text(
                       match.result!.description ?? '',
                       style: AppTextStyles.body2.copyWith(
-                          color: AppColors.success, fontWeight: FontWeight.w500),
+                          color: AppColors.success, fontWeight: FontWeight.w600),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ],
                 if (match.innings1 != null || match.innings2 != null) ...[
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      if (match.innings1 != null)
-                        Text(
-                          '${match.innings1!.battingTeamName}: ${match.innings1!.scoreDisplay} (${match.innings1!.oversDisplay})',
-                          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      if (match.innings2 != null)
-                        Text(
-                          '${match.innings2!.battingTeamName}: ${match.innings2!.scoreDisplay} (${match.innings2!.oversDisplay})',
-                          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                    ],
+                  NeoCard(
+                    style: NeoStyle.inset,
+                    borderRadius: 12,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (match.innings1 != null)
+                          Text(
+                            '${match.innings1!.battingTeamName}: ${match.innings1!.scoreDisplay} (${match.innings1!.oversDisplay})',
+                            style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        if (match.innings2 != null)
+                          Text(
+                            '${match.innings2!.battingTeamName}: ${match.innings2!.scoreDisplay} (${match.innings2!.oversDisplay})',
+                            style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
                 if (match.isLive) ...[

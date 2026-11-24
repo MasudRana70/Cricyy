@@ -11,9 +11,11 @@ import '../../providers/match_provider.dart';
 import '../../models/match_model.dart';
 import '../../models/innings_model.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/neo_card.dart';
 import '../../widgets/score_badge.dart';
 import '../../widgets/player_avatar.dart';
 import '../../widgets/player_quick_view_sheet.dart';
+import '../../widgets/sync_controls.dart';
 
 class LiveScoringScreen extends StatefulWidget {
   const LiveScoringScreen({super.key});
@@ -39,10 +41,10 @@ class _LiveScoringScreenState extends State<LiveScoringScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.neoBackground,
       body: Consumer<MatchProvider>(
         builder: (context, prov, _) {
-          if (prov.isLoading) {
+          if (prov.isLoading && prov.matches.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
           if (prov.currentInnings == null) {
@@ -77,14 +79,24 @@ class _LiveScoringScreenState extends State<LiveScoringScreen> {
             children: [
               _ScoreHeader(innings: innings),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  child: Column(
-                    children: [
-                      _CurrentPlayersCard(innings: innings),
-                      AppSpacing.vGap(AppSpacing.md),
-                      _ScoringPanel(innings: innings),
-                    ],
+                child: RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () => prov.refreshMatches(silent: false),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                        child: Column(
+                          children: [
+                            _CurrentPlayersCard(innings: innings),
+                            AppSpacing.vGap(AppSpacing.md),
+                            _ScoringPanel(innings: innings),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -107,47 +119,53 @@ class _ScoreHeader extends StatelessWidget {
     final totalOvers = match?.totalOvers ?? 20;
 
     return Container(
-      color: AppColors.primary,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neoShadowDark,
+            offset: Offset(0, 6),
+            blurRadius: 16,
+          ),
+        ],
+      ),
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
         left: 16, right: 16, bottom: 16,
       ),
-      child: Column(
-        children: [
-          // Top bar
-          Row(
+      child: Center(
+        heightFactor: 1.0,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 20),
-              ),
-              Expanded(
-                child: Text(
-                  '${innings.battingTeamName} vs ${innings.bowlingTeamName} • Innings ${innings.inningsNumber}',
-                  style: AppTextStyles.label.copyWith(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              // Top bar
               Row(
                 children: [
-                  Container(
-                    width: 7, height: 7,
-                    margin: const EdgeInsets.only(right: 5),
-                    decoration: const BoxDecoration(color: AppColors.live, shape: BoxShape.circle),
-                  ),
-                  Text(
-                    innings.status == 'completed' ? 'DONE' : 'LIVE',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.arrow_back_ios, color: Colors.white, size: 19),
                     ),
                   ),
+                  Expanded(
+                    child: Text(
+                      '${innings.battingTeamName} vs ${innings.bowlingTeamName} • Inn ${innings.inningsNumber}',
+                      style: AppTextStyles.label.copyWith(color: Colors.white70),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SyncActionControls(darkSurface: true, compact: true),
                 ],
               ),
-            ],
-          ),
           const SizedBox(height: 14),
 
           // Main score & Overs
@@ -204,7 +222,9 @@ class _ScoreHeader extends StatelessWidget {
           // Over progress dots bar
           const SizedBox(height: 10),
           _OverProgressBar(currentBall: innings.currentBallInOver),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -915,21 +935,21 @@ class _ScoringPanelState extends State<_ScoringPanel> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  _RunButton(value: '0', color: AppColors.textHint, bgColor: AppColors.surfaceVariant, onTap: () => _handleBall(runs: 0)),
+                  _RunButton(value: '0', color: AppColors.dot,     bgColor: AppColors.neoPressed, onTap: () => _handleBall(runs: 0)),
                   const SizedBox(width: 8),
-                  _RunButton(value: '1', color: AppColors.success, bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 1)),
+                  _RunButton(value: '1', color: AppColors.run,     bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 1)),
                   const SizedBox(width: 8),
-                  _RunButton(value: '2', color: AppColors.success, bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 2)),
+                  _RunButton(value: '2', color: AppColors.run,     bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 2)),
                   const SizedBox(width: 8),
-                  _RunButton(value: '3', color: AppColors.success, bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 3)),
+                  _RunButton(value: '3', color: AppColors.run,     bgColor: AppColors.successLight, onTap: () => _handleBall(runs: 3)),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _RunButton(value: '4', color: AppColors.primary, bgColor: AppColors.primaryLight, flex: 2, onTap: () => _handleBall(runs: 4)),
+                  _RunButton(value: '4', color: AppColors.boundary, bgColor: AppColors.primaryLight, flex: 2, onTap: () => _handleBall(runs: 4)),
                   const SizedBox(width: 8),
-                  _RunButton(value: '6', color: AppColors.six, bgColor: const Color(0xFFF3E8FF), flex: 2, onTap: () => _handleBall(runs: 6)),
+                  _RunButton(value: '6', color: AppColors.six,      bgColor: const Color(0xFFF3E8FF), flex: 2, onTap: () => _handleBall(runs: 6)),
                 ],
               ),
             ],
@@ -950,33 +970,19 @@ class _ScoringPanelState extends State<_ScoringPanel> {
                     Text('Extras (Tap then tap runs)', style: AppTextStyles.label.copyWith(color: AppColors.textHint)),
                     const SizedBox(height: 8),
                     Wrap(
-                      spacing: 6, runSpacing: 6,
+                      spacing: 8, runSpacing: 8,
                       children: _extraOptions.map((opt) {
                         final val = opt['value']!;
                         final sel = _selectedExtra == val;
-                        return GestureDetector(
+                        return NeoPillButton(
+                          label: opt['label']!,
+                          selected: sel,
+                          selectedColor: AppColors.warning,
                           onTap: () {
                             setState(() {
                               _selectedExtra = sel ? null : val;
                             });
                           },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: sel ? AppColors.warning : AppColors.surfaceVariant,
-                              borderRadius: AppRadius.rFull,
-                              border: Border.all(
-                                color: sel ? AppColors.warning : AppColors.border,
-                              ),
-                            ),
-                            child: Text(
-                              opt['label']!,
-                              style: AppTextStyles.caption.copyWith(
-                                color: sel ? Colors.white : AppColors.textSecondary,
-                                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                              ),
-                            ),
-                          ),
                         );
                       }).toList(),
                     ),
@@ -986,24 +992,34 @@ class _ScoringPanelState extends State<_ScoringPanel> {
             ),
             const SizedBox(width: 10),
 
-            // Wicket button
+            // Wicket button — neomorphic red
             GestureDetector(
               onTap: () => _showWicketModal(context),
               child: Container(
-                width: 76,
+                width: 80,
                 height: 94,
                 decoration: BoxDecoration(
-                  color: AppColors.errorLight,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.wicket, Color(0xFF8B0000)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: AppRadius.rLG,
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.wicket.withValues(alpha: 0.42),
+                      offset: const Offset(0, 6),
+                      blurRadius: 14,
+                    ),
+                  ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.flag_outlined, size: 24, color: AppColors.error),
+                    const Icon(Icons.flag, size: 24, color: Colors.white),
                     const SizedBox(height: 2),
-                    Text('W', style: AppTextStyles.scoringButton.copyWith(color: AppColors.error)),
-                    Text('Wicket', style: AppTextStyles.caption.copyWith(color: AppColors.error, fontWeight: FontWeight.bold)),
+                    Text('W', style: AppTextStyles.scoringButton.copyWith(color: Colors.white, fontSize: 26)),
+                    Text('Wicket', style: AppTextStyles.caption.copyWith(color: Colors.white70, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -1055,7 +1071,7 @@ class _ScoringPanelState extends State<_ScoringPanel> {
   }
 }
 
-class _RunButton extends StatelessWidget {
+class _RunButton extends StatefulWidget {
   final String value;
   final Color color;
   final Color bgColor;
@@ -1071,22 +1087,82 @@ class _RunButton extends StatelessWidget {
   });
 
   @override
+  State<_RunButton> createState() => _RunButtonState();
+}
+
+class _RunButtonState extends State<_RunButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Expanded(
-      flex: flex,
+      flex: widget.flex,
       child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 56,
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: AppRadius.rMD,
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
-          child: Center(
-            child: Text(
-              value,
-              style: AppTextStyles.scoringButton.copyWith(color: color),
+        onTapDown: (_) => _ctrl.forward(),
+        onTapUp: (_) {
+          _ctrl.reverse();
+          widget.onTap();
+        },
+        onTapCancel: () => _ctrl.reverse(),
+        child: ScaleTransition(
+          scale: _scale,
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  widget.color,
+                  Color.lerp(widget.color, Colors.black, 0.18)!,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.38),
+                  offset: const Offset(0, 6),
+                  blurRadius: 14,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  offset: const Offset(0, -1),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                widget.value,
+                style: AppTextStyles.scoringButton.copyWith(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1,
+                ),
+              ),
             ),
           ),
         ),

@@ -9,8 +9,10 @@ import '../../providers/match_provider.dart';
 import '../../models/match_model.dart';
 import '../../models/innings_model.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/player_quick_view_sheet.dart';
+import '../../widgets/sync_controls.dart';
 
 class ScorecardScreen extends StatefulWidget {
   const ScorecardScreen({super.key});
@@ -45,11 +47,11 @@ class _ScorecardScreenState extends State<ScorecardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.neoBackground,
       appBar: _buildAppBar(),
       body: Consumer<MatchProvider>(
         builder: (context, prov, _) {
-          if (prov.isLoading) {
+          if (prov.isLoading && prov.matches.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -80,40 +82,48 @@ class _ScorecardScreenState extends State<ScorecardScreen>
             );
           }
 
-          return Column(
-            children: [
-              _MatchSummaryHeader(
-                inn1: inn1,
-                inn2: inn2,
-              ),
-              TabBar(
-                controller: _tab,
-                tabs: [
-                  Tab(text: '${inn1.battingTeamName} (1st Inn)'),
-                  Tab(text: inn2 != null ? '${inn2.battingTeamName} (2nd Inn)' : '2nd Innings'),
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 820),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: _MatchSummaryHeader(
+                      inn1: inn1,
+                      inn2: inn2,
+                    ),
+                  ),
+                  TabBar(
+                    controller: _tab,
+                    tabs: [
+                      Tab(text: '${inn1.battingTeamName} (1st Inn)'),
+                      Tab(text: inn2 != null ? '${inn2.battingTeamName} (2nd Inn)' : '2nd Innings'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tab,
+                      children: [
+                        _InningsScorecard(innings: inn1),
+                        inn2 != null
+                            ? _InningsScorecard(innings: inn2)
+                            : Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    '2nd innings has not started yet.\nTarget will be ${inn1.totalRuns + 1} runs.',
+                                    style: AppTextStyles.body2,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tab,
-                  children: [
-                    _InningsScorecard(innings: inn1),
-                    inn2 != null
-                        ? _InningsScorecard(innings: inn2)
-                        : Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                '2nd innings has not started yet.\nTarget will be ${inn1.totalRuns + 1} runs.',
-                                style: AppTextStyles.body2,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           );
         },
       ),
@@ -123,6 +133,12 @@ class _ScorecardScreenState extends State<ScorecardScreen>
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text('Full Scorecard'),
+      actions: const [
+        Padding(
+          padding: EdgeInsets.only(right: 12),
+          child: SyncActionControls(compact: true),
+        ),
+      ],
     );
   }
 }
@@ -137,9 +153,8 @@ class _MatchSummaryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final match = context.watch<MatchProvider>().selectedMatch;
 
-    return Container(
-      color: AppColors.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Column(
         children: [
           Row(
@@ -159,12 +174,10 @@ class _MatchSummaryHeader extends StatelessWidget {
                 children: [
                   Text('vs', style: AppTextStyles.body2),
                   AppSpacing.vGap(AppSpacing.xs),
-                  Container(
+                  NeoCard(
+                    style: NeoStyle.inset,
+                    borderRadius: 100,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: AppRadius.rFull,
-                    ),
                     child: Text(match?.format ?? 'T20',
                         style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                   ),
@@ -218,9 +231,14 @@ class _InningsScorecard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: AppSpacing.pagePadding,
-      children: [
+    final prov = context.read<MatchProvider>();
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => prov.refreshMatches(silent: false),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppSpacing.pagePadding,
+        children: [
         // Batting table
         const SectionHeader(title: 'Batting'),
         AppCard(
@@ -308,7 +326,8 @@ class _InningsScorecard extends StatelessWidget {
           ),
           AppSpacing.vGap(AppSpacing.xl),
         ],
-      ],
+        ],
+      ),
     );
   }
 }
@@ -320,8 +339,11 @@ class _TableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.surfaceVariant,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: const BoxDecoration(
+        color: AppColors.neoPressed,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: columns.asMap().entries.map((e) {
           final isFirst = e.key == 0;

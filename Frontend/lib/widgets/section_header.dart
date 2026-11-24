@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../core/app_spacing.dart';
+import 'neo_card.dart';
 
 class SectionHeader extends StatelessWidget {
   final String title;
@@ -23,11 +24,20 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
+          Container(
+            width: 4,
+            height: 18,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           Expanded(child: Text(title, style: AppTextStyles.headline3)),
           if (action != null)
             TextButton(
               onPressed: onAction,
-              child: Text(action!, style: AppTextStyles.body2.copyWith(color: AppColors.primary)),
+              child: Text(action!, style: AppTextStyles.body2.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
         ],
       ),
@@ -35,7 +45,7 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-// Thin category tag chip
+// Neomorphic category tag chip
 class FormatChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -50,26 +60,10 @@ class FormatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return NeoPillButton(
+      label: label,
+      selected: selected,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color:  selected ? AppColors.primary : AppColors.surfaceVariant,
-          borderRadius: AppRadius.rFull,
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.label.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          ),
-        ),
-      ),
     );
   }
 }

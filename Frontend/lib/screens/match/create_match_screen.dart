@@ -8,6 +8,7 @@ import '../../core/app_spacing.dart';
 import '../../core/app_constants.dart';
 import '../../providers/match_provider.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
 
 class CreateMatchScreen extends StatefulWidget {
@@ -67,27 +68,32 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.neoBackground,
       appBar: AppBar(
         title: const Text('New Match Setup'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
           child: LinearProgressIndicator(
             value: (_page + 1) / 3,
-            backgroundColor: AppColors.borderLight,
+            backgroundColor: AppColors.neoPressed,
             valueColor: const AlwaysStoppedAnimation(AppColors.primary),
             minHeight: 3,
           ),
         ),
       ),
-      body: PageView(
-        controller: _pageCtrl,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _buildTeamsAndOversPage(),
-          _buildTossPage(),
-          _buildOpeningPlayersPage(),
-        ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: PageView(
+            controller: _pageCtrl,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildTeamsAndOversPage(),
+              _buildTossPage(),
+              _buildOpeningPlayersPage(),
+            ],
+          ),
+        ),
       ),
       bottomNavigationBar: _buildBottomBar(),
     );
@@ -95,29 +101,44 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      color: AppColors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      child: Row(
-        children: [
-          if (_page > 0)
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _prevPage,
-                child: const Text('Back'),
-              ),
-            ),
-          if (_page > 0) const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton(
-              onPressed: _page < 2 ? _nextPage : _startMatch,
-              child: Text(
-                _page < 2 ? 'Continue' : 'Start Match',
-                style: AppTextStyles.button,
-              ),
-            ),
+      decoration: BoxDecoration(
+        color: AppColors.neoBackground,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neoShadowDark.withValues(alpha: 0.4),
+            offset: const Offset(0, -4),
+            blurRadius: 14,
           ),
         ],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Center(
+        heightFactor: 1.0,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: Row(
+            children: [
+              if (_page > 0)
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _prevPage,
+                    child: const Text('Back'),
+                  ),
+                ),
+              if (_page > 0) const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _page < 2 ? _nextPage : _startMatch,
+                  child: Text(
+                    _page < 2 ? 'Continue' : 'Start Match',
+                    style: AppTextStyles.button,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -205,30 +226,45 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
           childAspectRatio: 2.4,
           children: ['T10', 'T20', 'ODI', 'CUSTOM'].map((f) {
             final sel = _format == f;
-            return GestureDetector(
-              onTap: () => setState(() {
-                _format = f;
-                _overs  = _formatOvers[f] ?? 20;
-              }),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : AppColors.surface,
-                  borderRadius: AppRadius.rMD,
-                  border: Border.all(color: sel ? AppColors.primary : AppColors.border),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (sel) const Icon(Icons.check_circle, color: Colors.white, size: 18),
-                    if (sel) const SizedBox(width: 6),
-                    Text(
-                      f == 'CUSTOM' ? 'Custom Overs' : '$f (${_formatOvers[f]} Ov)',
-                      style: AppTextStyles.bodyBold.copyWith(
-                        color: sel ? Colors.white : AppColors.textPrimary,
-                        fontSize: 13,
-                      ),
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  _format = f;
+                  _overs  = _formatOvers[f] ?? 20;
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  decoration: BoxDecoration(
+                    color: sel ? AppColors.primary : AppColors.neoBackground,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: sel ? AppColors.primary : Colors.white.withValues(alpha: 0.65),
                     ),
-                  ],
+                    boxShadow: sel
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.30),
+                              offset: const Offset(0, 4),
+                              blurRadius: 10,
+                            ),
+                          ]
+                        : NeoCard.raisedShadows(blur: 8, offset: 3),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (sel) const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                      if (sel) const SizedBox(width: 6),
+                      Text(
+                        f == 'CUSTOM' ? 'Custom Overs' : '$f (${_formatOvers[f]} Ov)',
+                        style: AppTextStyles.bodyBold.copyWith(
+                          color: sel ? Colors.white : AppColors.textPrimary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -303,23 +339,38 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => setState(() => _tossWinner = name),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: sel ? AppColors.primary : AppColors.surface,
-                      borderRadius: AppRadius.rMD,
-                      border: Border.all(color: sel ? AppColors.primary : AppColors.border),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name,
-                        style: AppTextStyles.bodyBold.copyWith(
-                          color: sel ? Colors.white : AppColors.textPrimary,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _tossWinner = name),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: sel ? AppColors.primary : AppColors.neoBackground,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: sel ? AppColors.primary : Colors.white.withValues(alpha: 0.65),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        boxShadow: sel
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.30),
+                                  offset: const Offset(0, 4),
+                                  blurRadius: 10,
+                                ),
+                              ]
+                            : NeoCard.raisedShadows(blur: 8, offset: 3),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name,
+                          style: AppTextStyles.bodyBold.copyWith(
+                            color: sel ? Colors.white : AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ),
@@ -333,53 +384,51 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
         const SectionHeader(title: 'Toss Decision'),
         Row(
           children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _tossDecision = 'bat'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _tossDecision == 'bat' ? AppColors.accent : AppColors.surface,
-                    borderRadius: AppRadius.rMD,
-                    border: Border.all(
-                      color: _tossDecision == 'bat' ? AppColors.accent : AppColors.border,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '🏏  Elected to Bat',
-                      style: AppTextStyles.bodyBold.copyWith(
-                        color: _tossDecision == 'bat' ? Colors.white : AppColors.textPrimary,
+            for (final opt in const [
+              (value: 'bat', label: '🏏  Elected to Bat'),
+              (value: 'bowl', label: '🎳  Elected to Bowl'),
+            ])
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: opt.value == 'bat' ? 10 : 0),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _tossDecision = opt.value),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: _tossDecision == opt.value ? AppColors.accent : AppColors.neoBackground,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _tossDecision == opt.value
+                                ? AppColors.accent
+                                : Colors.white.withValues(alpha: 0.65),
+                          ),
+                          boxShadow: _tossDecision == opt.value
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.accent.withValues(alpha: 0.30),
+                                    offset: const Offset(0, 4),
+                                    blurRadius: 10,
+                                  ),
+                                ]
+                              : NeoCard.raisedShadows(blur: 8, offset: 3),
+                        ),
+                        child: Center(
+                          child: Text(
+                            opt.label,
+                            style: AppTextStyles.bodyBold.copyWith(
+                              color: _tossDecision == opt.value ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _tossDecision = 'bowl'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _tossDecision == 'bowl' ? AppColors.accent : AppColors.surface,
-                    borderRadius: AppRadius.rMD,
-                    border: Border.all(
-                      color: _tossDecision == 'bowl' ? AppColors.accent : AppColors.border,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '🎳  Elected to Bowl',
-                      style: AppTextStyles.bodyBold.copyWith(
-                        color: _tossDecision == 'bowl' ? Colors.white : AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
 
@@ -538,18 +587,11 @@ class _StepperButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return NeoIconButton(
+      icon: icon,
+      size: 38,
+      iconColor: AppColors.primary,
       onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: AppRadius.rSM,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Icon(icon, size: 18, color: AppColors.textPrimary),
-      ),
     );
   }
 }

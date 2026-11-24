@@ -1,9 +1,12 @@
 // lib/providers/match_provider.dart
 
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/widgets.dart';
+import '../core/app_constants.dart';
 import '../models/match_model.dart';
 import '../models/innings_model.dart';
 import '../services/local_storage_service.dart';
+import '../services/match_api_service.dart';
 
 class BallResult {
   final bool overCompleted;
@@ -22,6 +25,11 @@ class BallResult {
 }
 
 class MatchProvider extends ChangeNotifier {
+  static const Duration autoRefreshInterval = Duration(seconds: 5);
+
+  final MatchApiService _apiService;
+  final bool _allowBackgroundTimers;
+
   List<MatchModel> _matches = [];
   MatchModel? _selectedMatch;
   InningsModel? _currentInnings;
@@ -30,20 +38,45 @@ class MatchProvider extends ChangeNotifier {
   final List<InningsModel> _undoStack = [];
 
   bool _isLoading = false;
+  bool _isRefreshing = false;
+  bool _isCloudConnected = false;
+  bool _autoRefreshEnabled = true;
+  bool _disposed = false;
+  DateTime? _lastSyncedAt;
   String? _error;
+  String? _syncError;
 
-  MatchProvider() {
+  Timer? _autoRefreshTimer;
+  Set<String> _pendingSyncMatchIds = {};
+  final Map<String, DateTime> _lastLocalMutationAt = {};
+  final Map<String, MatchModel> _queuedSyncPayload = {};
+  final Set<String> _activeSyncInFlight = {};
+
+  MatchProvider({
+    MatchApiService? apiService,
+    bool? enableAutoRefresh,
+  })  : _apiService = apiService ?? MatchApiService(),
+        _allowBackgroundTimers = enableAutoRefresh ??
+            !WidgetsBinding.instance.runtimeType.toString().contains('Test') {
     loadMatches();
+    if (_allowBackgroundTimers && _autoRefreshEnabled) {
+      startAutoRefresh();
+    }
   }
 
-  List<MatchModel> get matches       => _matches;
-  MatchModel?       get selectedMatch => _selectedMatch;
-  InningsModel?     get currentInnings => _currentInnings;
-  InningsModel?     get firstInnings  => _firstInnings;
-  InningsModel?     get secondInnings => _secondInnings;
-  bool              get canUndo       => _undoStack.isNotEmpty;
-  bool              get isLoading     => _isLoading;
-  String?           get error         => _error;
+  List<MatchModel> get matches          => _matches;
+  MatchModel?       get selectedMatch    => _selectedMatch;
+  InningsModel?     get currentInnings   => _currentInnings;
+  InningsModel?     get firstInnings     => _firstInnings;
+  InningsModel?     get secondInnings    => _secondInnings;
+  bool              get canUndo          => _undoStack.isNotEmpty;
+  bool              get isLoading        => _isLoading;
+  bool              get isRefreshing     => _isRefreshing;
+  bool              get isCloudConnected => _isCloudConnected;
+  bool              get autoRefreshEnabled => _autoRefreshEnabled;
+  DateTime?         get lastSyncedAt     => _lastSyncedAt;
+  String?           get error            => _error;
+  String?           get syncError        => _syncError;
 
   List<MatchModel> get liveMatches =>
       _matches.where((m) => m.isLive).toList();
@@ -51,11 +84,68 @@ class MatchProvider extends ChangeNotifier {
   List<MatchModel> get completedMatches =>
       _matches.where((m) => m.isCompleted).toList();
 
-  // ── Load Real Matches from Local Storage (No Dummy Data) ──────────────────
+  @override
+  void dispose() {
+    _disposed = true;
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  void startAutoRefresh() {
+    if (!_allowBackgroundTimers || _disposed) return;
+    _autoRefreshTimer?.cancel();
+    _autoRefreshEnabled = true;
+    _autoRefreshTimer = Timer.periodic(autoRefreshInterval, (_) {
+      if (_autoRefreshEnabled && !_isRefreshing && !_disposed) {
+        refreshMatches(silent: true);
+      }
+    });
+    _safeNotify();
+  }
+
+  void stopAutoRefresh() {
+    _autoRefreshEnabled = false;
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+    _safeNotify();
+  }
+
+  void toggleAutoRefresh([bool? enabled]) {
+    final target = enabled ?? !_autoRefreshEnabled;
+    if (target) {
+      startAutoRefresh();
+      refreshMatches(silent: true);
+    } else {
+      stopAutoRefresh();
+    }
+  }
+
+  /// Configure a custom Backend API URL (e.g. your Vercel deployment URL) at runtime.
+  Future<void> setCustomServerUrl(String? url) async {
+    AppConstants.setCustomBaseUrl(url);
+    await LocalStorageService.instance.saveCustomApiUrl(url);
+    await refreshMatches(silent: false);
+  }
+
+  // ── Load Local Cache First, Then Sync with Cloud Backend ─────────────────
   Future<void> loadMatches() async {
     _isLoading = true;
-    notifyListeners();
+    _safeNotify();
 
+    // Load saved custom API URL if present
+    final savedApiUrl = await LocalStorageService.instance.loadCustomApiUrl();
+    if (savedApiUrl != null && savedApiUrl.isNotEmpty) {
+      AppConstants.setCustomBaseUrl(savedApiUrl);
+    }
+
+    _pendingSyncMatchIds = await LocalStorageService.instance.loadPendingSyncIds();
     _matches = await LocalStorageService.instance.loadMatches();
 
     if (_matches.isNotEmpty && _selectedMatch == null) {
@@ -64,7 +154,110 @@ class MatchProvider extends ChangeNotifier {
     }
 
     _isLoading = false;
-    notifyListeners();
+    _safeNotify();
+
+    // Sync with cloud backend (Vercel + MongoDB Atlas) when running live
+    if (_allowBackgroundTimers) {
+      await refreshMatches(silent: true);
+    }
+  }
+
+  /// Pull latest matches from shared cloud backend and push any pending local matches.
+  Future<void> refreshMatches({bool silent = false}) async {
+    if (_isRefreshing || _disposed) return;
+    _isRefreshing = true;
+    if (!silent) _safeNotify();
+
+    try {
+      // 1. Push any matches awaiting upload (including legacy local-only matches)
+      final remoteBefore = await _apiService.fetchSharedMatches();
+      final remoteById = {for (final m in remoteBefore) m.id: m};
+
+      final toUpload = <MatchModel>[];
+      for (final local in _matches) {
+        if (_pendingSyncMatchIds.contains(local.id) || !remoteById.containsKey(local.id)) {
+          toUpload.add(local);
+        }
+      }
+
+      if (toUpload.isNotEmpty) {
+        for (final m in toUpload) {
+          try {
+            final saved = await _apiService.upsertSharedMatch(m);
+            remoteById[saved.id] = saved;
+            _pendingSyncMatchIds.remove(m.id);
+          } catch (_) {
+            // Keep pending for retry
+          }
+        }
+        await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+      }
+
+      // 2. Merge remote state while respecting active local edits
+      final now = DateTime.now();
+      final localById = {for (final m in _matches) m.id: m};
+      final mergedMap = <String, MatchModel>{};
+
+      for (final entry in remoteById.entries) {
+        final id = entry.key;
+        final remote = entry.value;
+        final local = localById[id];
+        final lastMut = _lastLocalMutationAt[id];
+        final mutatedRecently = lastMut != null && now.difference(lastMut).inSeconds < 4;
+
+        if (local != null &&
+            (_pendingSyncMatchIds.contains(id) ||
+                _queuedSyncPayload.containsKey(id) ||
+                _activeSyncInFlight.contains(id) ||
+                mutatedRecently)) {
+          mergedMap[id] = local;
+        } else {
+          mergedMap[id] = remote;
+        }
+      }
+
+      // Preserve any unsynced local matches not yet on server
+      for (final local in _matches) {
+        if (!mergedMap.containsKey(local.id) && _pendingSyncMatchIds.contains(local.id)) {
+          mergedMap[local.id] = local;
+        }
+      }
+
+      final mergedList = mergedMap.values.toList()
+        ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
+
+      _matches = mergedList;
+
+      // Refresh selected match & innings snapshots for viewers watching live/scorecard
+      if (_selectedMatch != null) {
+        final updatedSelected = mergedMap[_selectedMatch!.id];
+        if (updatedSelected != null) {
+          final lastMut = _lastLocalMutationAt[updatedSelected.id];
+          final mutatedRecently = lastMut != null && now.difference(lastMut).inSeconds < 4;
+          final isActivelyEditingLocally = _pendingSyncMatchIds.contains(updatedSelected.id) ||
+              _queuedSyncPayload.containsKey(updatedSelected.id) ||
+              _activeSyncInFlight.contains(updatedSelected.id) ||
+              mutatedRecently;
+          if (!isActivelyEditingLocally) {
+            _selectedMatch = updatedSelected;
+            _firstInnings = updatedSelected.innings1;
+            _secondInnings = updatedSelected.innings2;
+            _currentInnings = updatedSelected.innings2 ?? updatedSelected.innings1;
+          }
+        }
+      }
+
+      await LocalStorageService.instance.saveMatches(_matches);
+      _isCloudConnected = true;
+      _syncError = null;
+      _lastSyncedAt = DateTime.now();
+    } catch (e) {
+      _isCloudConnected = false;
+      _syncError = e.toString();
+    } finally {
+      _isRefreshing = false;
+      _safeNotify();
+    }
   }
 
   void selectMatch(MatchModel match) {
@@ -72,7 +265,8 @@ class MatchProvider extends ChangeNotifier {
     _firstInnings = match.innings1;
     _secondInnings = match.innings2;
     _currentInnings = match.innings2 ?? match.innings1;
-    notifyListeners();
+    _undoStack.clear();
+    _safeNotify();
   }
 
   // ── Create New Match with Custom Teams & Opening Players ──────────────────
@@ -700,5 +894,70 @@ class MatchProvider extends ChangeNotifier {
 
   void _persistMatches() {
     LocalStorageService.instance.saveMatches(_matches);
+    final matchToSync = _selectedMatch;
+    if (matchToSync != null && _allowBackgroundTimers) {
+      _enqueueMatchSync(matchToSync);
+    }
+  }
+
+  void _enqueueMatchSync(MatchModel match) {
+    final id = match.id;
+    _lastLocalMutationAt[id] = DateTime.now();
+    _pendingSyncMatchIds.add(id);
+    _queuedSyncPayload[id] = match;
+    LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+
+    if (_activeSyncInFlight.contains(id)) return;
+    _drainMatchSyncQueue(id);
+  }
+
+  Future<void> _drainMatchSyncQueue(String id) async {
+    _activeSyncInFlight.add(id);
+    try {
+      while (_queuedSyncPayload.containsKey(id) && !_disposed) {
+        final payload = _queuedSyncPayload.remove(id)!;
+        try {
+          await _apiService.upsertSharedMatch(payload);
+          _isCloudConnected = true;
+          _syncError = null;
+          _lastSyncedAt = DateTime.now();
+
+          if (!_queuedSyncPayload.containsKey(id)) {
+            _pendingSyncMatchIds.remove(id);
+            await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+          }
+          _safeNotify();
+        } catch (e) {
+          // Leave in _pendingSyncMatchIds so next auto/manual refresh retries
+          _isCloudConnected = false;
+          _syncError = e.toString();
+          _safeNotify();
+          break;
+        }
+      }
+    } finally {
+      _activeSyncInFlight.remove(id);
+    }
+  }
+
+  Future<void> deleteMatch(String matchId) async {
+    _matches.removeWhere((m) => m.id == matchId);
+    _pendingSyncMatchIds.remove(matchId);
+    _queuedSyncPayload.remove(matchId);
+    if (_selectedMatch?.id == matchId) {
+      _selectedMatch = _matches.firstOrNull;
+      _firstInnings = _selectedMatch?.innings1;
+      _secondInnings = _selectedMatch?.innings2;
+      _currentInnings = _selectedMatch?.innings2 ?? _selectedMatch?.innings1;
+    }
+    await LocalStorageService.instance.saveMatches(_matches);
+    await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+    _safeNotify();
+
+    if (_allowBackgroundTimers) {
+      try {
+        await _apiService.deleteSharedMatch(matchId);
+      } catch (_) {}
+    }
   }
 }

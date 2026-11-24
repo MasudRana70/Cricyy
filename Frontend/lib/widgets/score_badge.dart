@@ -1,4 +1,4 @@
-// lib/widgets/score_badge.dart — colored badge for scoring events
+// lib/widgets/score_badge.dart — colored neomorphic badge for scoring events
 
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
@@ -24,10 +24,10 @@ class ScoreBadge extends StatelessWidget {
       type = ScoreType.wide;
     } else if (val.startsWith('nb')) {
       type = ScoreType.noBall;
-    } else if (val.startsWith('b')) {
-      type = ScoreType.bye;
     } else if (val.startsWith('lb')) {
       type = ScoreType.legBye;
+    } else if (val.startsWith('b')) {
+      type = ScoreType.bye;
     } else if (val.contains('W')) {
       type = ScoreType.wicket;
     } else {
@@ -45,7 +45,7 @@ class ScoreBadge extends StatelessWidget {
   }
 
   Color get _bg => switch (type) {
-    ScoreType.dot    => AppColors.surfaceVariant,
+    ScoreType.dot    => AppColors.neoPressed,
     ScoreType.one    => AppColors.successLight,
     ScoreType.two    => AppColors.successLight,
     ScoreType.three  => AppColors.successLight,
@@ -54,8 +54,8 @@ class ScoreBadge extends StatelessWidget {
     ScoreType.wicket => AppColors.errorLight,
     ScoreType.wide   => AppColors.warningLight,
     ScoreType.noBall => AppColors.warningLight,
-    ScoreType.bye    => AppColors.surfaceVariant,
-    ScoreType.legBye => AppColors.surfaceVariant,
+    ScoreType.bye    => AppColors.neoPressed,
+    ScoreType.legBye => AppColors.neoPressed,
   };
 
   Color get _fg => switch (type) {
@@ -78,11 +78,23 @@ class ScoreBadge extends StatelessWidget {
     return Container(
       constraints: BoxConstraints(minWidth: size),
       height: size,
-      padding: EdgeInsets.symmetric(horizontal: isLong ? 6 : 2),
+      padding: EdgeInsets.symmetric(horizontal: isLong ? 7 : 2),
       decoration: BoxDecoration(
         color: _bg,
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(color: _fg.withOpacity(0.3), width: 1),
+        border: Border.all(color: _fg.withValues(alpha: 0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.neoShadowDark.withValues(alpha: 0.45),
+            offset: const Offset(2, 2),
+            blurRadius: 4,
+          ),
+          BoxShadow(
+            color: AppColors.neoShadowLight.withValues(alpha: 0.9),
+            offset: const Offset(-2, -2),
+            blurRadius: 4,
+          ),
+        ],
       ),
       child: Center(
         child: Text(

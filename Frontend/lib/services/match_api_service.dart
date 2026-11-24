@@ -8,6 +8,49 @@ class MatchApiService {
   final ApiClient client;
   MatchApiService({ApiClient? client}) : client = client ?? ApiClient();
 
+  // ── Shared Multi-User Cloud Sync Endpoints (/api/shared-matches) ─────────
+  Future<List<MatchModel>> fetchSharedMatches({String? status, int limit = 100}) async {
+    final query = <String, String>{
+      'limit': limit.toString(),
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+    final res = await client.get('/shared-matches', queryParams: query);
+    if (res is Map && res['matches'] is List) {
+      return (res['matches'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(MatchModel.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<MatchModel?> fetchSharedMatchById(String id) async {
+    final res = await client.get('/shared-matches/$id');
+    if (res is Map && res['match'] is Map<String, dynamic>) {
+      return MatchModel.fromJson(res['match'] as Map<String, dynamic>);
+    }
+    return null;
+  }
+
+  Future<MatchModel> upsertSharedMatch(MatchModel match) async {
+    final res = await client.put('/shared-matches/${match.id}', body: match.toJson());
+    if (res is Map && res['match'] is Map<String, dynamic>) {
+      return MatchModel.fromJson(res['match'] as Map<String, dynamic>);
+    }
+    return match;
+  }
+
+  Future<void> deleteSharedMatch(String id) async {
+    await client.delete('/shared-matches/$id');
+  }
+
+  Future<Map<String, dynamic>> checkHealth() async {
+    final res = await client.get('/health');
+    if (res is Map<String, dynamic>) return res;
+    return {'status': 'unknown'};
+  }
+
+  // ── Legacy / Granular Match Endpoints (/api/matches) ─────────────────────
   Future<List<MatchModel>> getMatches({String? status, String? team, int page = 1, int limit = 20}) async {
     final query = <String, String>{
       'page': page.toString(),

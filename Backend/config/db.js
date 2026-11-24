@@ -1,37 +1,48 @@
 /**
- * config/db.js  –  MongoDB Connection
+ * config/db.js  –  MongoDB Connection (Local + Serverless / Vercel Cached)
  *
- * Uses Mongoose to connect to MongoDB.
- * The connection string comes from the MONGODB_URI environment variable.
- *
- * Why a separate file?
- *   Keeping the DB connection in its own module means you can import it
- *   from index.js and from test files without duplicating code.
+ * Uses Mongoose with a global connection cache so Vercel Serverless Functions
+ * reuse warm database connections instead of opening a new connection per request.
  */
 
 'use strict';
 
 const mongoose = require('mongoose');
 
+const globalCache = global._cricyyMongoose || (global._cricyyMongoose = { conn: null, promise: null });
+
 const connectDB = async () => {
-  try {
-    const uri = process.env.MONGODB_URI;
-
-    if (!uri) {
-      throw new Error('MONGODB_URI is not defined in your .env file');
-    }
-
-    const conn = await mongoose.connect(uri, {
-      // These options silence deprecation warnings in Mongoose 8+
-      // (most are the new defaults, but being explicit is clearer for learners)
-    });
-
-    console.log(`✅ MongoDB connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error(`❌ MongoDB connection error: ${error.message}`);
-    // Exit the process with failure code so the problem is immediately visible
-    process.exit(1);
+  if (globalCache.conn && mongoose.connection.readyState === 1) {
+    return globalCache.conn;
   }
+
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI is not defined in environment variables');
+  }
+
+  if (!globalCache.promise) {
+    globalCache.promise = mongoose
+      .connect(uri, {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 8000,
+        maxPoolSize: 10,
+      })
+      .then((mongooseInstance) => {
+        console.log(`✅ MongoDB connected: ${mongooseInstance.connection.host}`);
+        return mongooseInstance;
+      })
+      .catch((err) => {
+        globalCache.promise = null;
+        console.error(`❌ MongoDB connection error: ${err.message}`);
+        throw err;
+      });
+  }
+
+  globalCache.conn = await globalCache.promise;
+  return globalCache.conn;
 };
+
+connectDB.isConnected = () => mongoose.connection.readyState === 1;
 
 module.exports = connectDB;
