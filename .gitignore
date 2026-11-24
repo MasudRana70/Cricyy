@@ -1,0 +1,62 @@
+# ============================================
+# Cricyy – Root .gitignore
+# ============================================
+
+# Local AI / Agent tooling & lockfiles
+.agents/
+skills-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor folders
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+
+# Logs & temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+tmp/
+temp/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+Backend/.env
+
+# Backend (Node.js)
+Backend/node_modules/
+Backend/coverage/
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+
+# Frontend (Flutter / Dart / Android / Web)
+Frontend/.dart_tool/
+Frontend/.flutter-plugins
+Frontend/.flutter-plugins-dependencies
+Frontend/.packages
+Frontend/.pub-cache/
+Frontend/.pub/
+Frontend/build/
+Frontend/coverage/
+Frontend/doc/api/
+Frontend/android/.gradle/
+Frontend/android/local.properties
+Frontend/android/captures/
+Frontend/android/app/debug/
+Frontend/android/app/profile/
+Frontend/android/app/release/
+Frontend/android/key.properties
+**/*.keystore
+**/*.jks
