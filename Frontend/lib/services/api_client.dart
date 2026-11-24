@@ -27,15 +27,20 @@ class ApiClient {
 
   String get baseUrl => _fixedBaseUrl ?? AppConstants.baseUrl;
 
-  Map<String, String> get _headers => {
+  Map<String, String> _mergeHeaders(Map<String, String>? extra) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...?extra,
       };
 
-  Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async {
+  Future<dynamic> get(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
-      final response = await _client.get(uri, headers: _headers).timeout(timeout);
+      final response = await _client.get(uri, headers: _mergeHeaders(headers)).timeout(timeout);
       return _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;
@@ -43,13 +48,17 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> post(String endpoint, {Map<String, dynamic>? body}) async {
+  Future<dynamic> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl$endpoint');
       final response = await _client
           .post(
             uri,
-            headers: _headers,
+            headers: _mergeHeaders(headers),
             body: body != null ? jsonEncode(body) : null,
           )
           .timeout(timeout);
@@ -60,13 +69,17 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> put(String endpoint, {Map<String, dynamic>? body}) async {
+  Future<dynamic> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
     try {
       final uri = Uri.parse('$baseUrl$endpoint');
       final response = await _client
           .put(
             uri,
-            headers: _headers,
+            headers: _mergeHeaders(headers),
             body: body != null ? jsonEncode(body) : null,
           )
           .timeout(timeout);
@@ -77,10 +90,14 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> delete(String endpoint) async {
+  Future<dynamic> delete(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+  }) async {
     try {
-      final uri = Uri.parse('$baseUrl$endpoint');
-      final response = await _client.delete(uri, headers: _headers).timeout(timeout);
+      final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
+      final response = await _client.delete(uri, headers: _mergeHeaders(headers)).timeout(timeout);
       return _processResponse(response);
     } catch (e) {
       if (e is ApiException) rethrow;

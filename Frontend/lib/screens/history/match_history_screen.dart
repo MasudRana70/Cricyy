@@ -11,7 +11,7 @@ import '../../models/match_model.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/sync_controls.dart';
+import '../../widgets/match_delete_helper.dart';
 
 class MatchHistoryScreen extends StatefulWidget {
   const MatchHistoryScreen({super.key});
@@ -45,12 +45,6 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
       backgroundColor: AppColors.neoBackground,
       appBar: AppBar(
         title: const Text('Match History'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: SyncActionControls(compact: true),
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -209,6 +203,17 @@ class _MatchHistoryCard extends StatelessWidget {
                 Text(_formatDate(match.matchDate),
                     style: AppTextStyles.caption.copyWith(
                         color: match.isLive ? Colors.white70 : AppColors.textHint)),
+                if (context.watch<MatchProvider>().canDeleteMatch(match)) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => confirmAndDeleteMatch(context, match),
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: match.isLive ? Colors.white : AppColors.error,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

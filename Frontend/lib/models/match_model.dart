@@ -58,6 +58,7 @@ class PlayerRef {
 // ── Match ─────────────────────────────────────────────────────────────────────
 class MatchModel {
   final String id;
+  final String? creatorId;
   final String team1Id;
   final String team2Id;
   final String team1Name;
@@ -77,6 +78,7 @@ class MatchModel {
 
   const MatchModel({
     required this.id,
+    this.creatorId,
     required this.team1Id,
     required this.team2Id,
     required this.team1Name,
@@ -100,6 +102,7 @@ class MatchModel {
 
   MatchModel copyWith({
     String? id,
+    String? creatorId,
     String? team1Id,
     String? team2Id,
     String? team1Name,
@@ -119,6 +122,7 @@ class MatchModel {
   }) {
     return MatchModel(
       id: id ?? this.id,
+      creatorId: creatorId ?? this.creatorId,
       team1Id: team1Id ?? this.team1Id,
       team2Id: team2Id ?? this.team2Id,
       team1Name: team1Name ?? this.team1Name,
@@ -140,6 +144,7 @@ class MatchModel {
 
   factory MatchModel.fromJson(Map<String, dynamic> json) => MatchModel(
     id:          json['_id'] ?? json['id'] ?? '',
+    creatorId:   json['creatorId']?.toString(),
     team1Id:     json['team1Id'] ?? '',
     team2Id:     json['team2Id'] ?? '',
     team1Name:   json['team1Name'] ?? '',
@@ -160,6 +165,7 @@ class MatchModel {
 
   Map<String, dynamic> toJson() => {
     '_id': id,
+    if (creatorId != null) 'creatorId': creatorId,
     'team1Id': team1Id,
     'team2Id': team2Id,
     'team1Name': team1Name,

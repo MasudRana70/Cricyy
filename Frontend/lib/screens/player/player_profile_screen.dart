@@ -9,7 +9,6 @@ import '../../providers/player_provider.dart';
 import '../../models/player_model.dart';
 import '../../services/player_stats_aggregator.dart';
 import '../../widgets/app_card.dart';
-import '../../widgets/neo_card.dart';
 import '../../widgets/player_avatar.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/player_performance_chart.dart';

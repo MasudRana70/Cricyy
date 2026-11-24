@@ -12,7 +12,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/player_quick_view_sheet.dart';
-import '../../widgets/sync_controls.dart';
+import '../../widgets/match_delete_helper.dart';
 
 class ScorecardScreen extends StatefulWidget {
   const ScorecardScreen({super.key});
@@ -108,14 +108,24 @@ class _ScorecardScreenState extends State<ScorecardScreen>
                         _InningsScorecard(innings: inn1),
                         inn2 != null
                             ? _InningsScorecard(innings: inn2)
-                            : Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Text(
-                                    '2nd innings has not started yet.\nTarget will be ${inn1.totalRuns + 1} runs.',
-                                    style: AppTextStyles.body2,
-                                    textAlign: TextAlign.center,
-                                  ),
+                            : RefreshIndicator(
+                                color: AppColors.primary,
+                                onRefresh: () => prov.refreshMatches(silent: false),
+                                child: ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    const SizedBox(height: 120),
+                                    Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Text(
+                                          '2nd innings has not started yet.\nTarget will be ${inn1.totalRuns + 1} runs.',
+                                          style: AppTextStyles.body2,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                       ],
@@ -133,10 +143,22 @@ class _ScorecardScreenState extends State<ScorecardScreen>
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text('Full Scorecard'),
-      actions: const [
-        Padding(
-          padding: EdgeInsets.only(right: 12),
-          child: SyncActionControls(compact: true),
+      actions: [
+        Consumer<MatchProvider>(
+          builder: (context, prov, _) {
+            final match = prov.selectedMatch;
+            if (!prov.canDeleteMatch(match)) return const SizedBox.shrink();
+            return IconButton(
+              tooltip: 'Delete match',
+              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+              onPressed: () async {
+                final deleted = await confirmAndDeleteMatch(context, match!);
+                if (deleted && context.mounted) {
+                  Navigator.pop(context);
+                }
+              },
+            );
+          },
         ),
       ],
     );

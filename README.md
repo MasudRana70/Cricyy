@@ -79,7 +79,7 @@
 
 ### 5. Minimalistic Neomorphism UI & Multi-User Real-Time Sync
 - **Minimalistic Neomorphism Design**: Soft tactile shadows (`NeoCard`, `NeoIconButton`, `NeoPillButton`, animated scoring buttons) with responsive wide-screen centering across mobile & web.
-- **Shared Cloud Matches + Auto-Refresh (5s)**: Matches created or scored by any user sync automatically to MongoDB Atlas (`/api/shared-matches`), with an automatic **5-second live refresh**, **pull-to-refresh**, **manual refresh button**, and an in-app **Cloud Sync Settings** modal.
+- **Shared Cloud Matches + Auto-Refresh (5s) + Creator Ownership**: Matches created or scored by any user sync automatically to MongoDB Atlas (`/api/shared-matches`), with background **5-second auto-refresh**, native **pull-to-refresh** (swipe down from top), and **creator-only match deletion** protection.
 
 ---
 

@@ -30,7 +30,7 @@ const app = express();
 const corsOptions = {
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'X-Device-Id'],
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));

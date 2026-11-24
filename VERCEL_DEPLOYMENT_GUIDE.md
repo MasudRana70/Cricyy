@@ -102,19 +102,16 @@ You can host the Flutter Web UI directly on Vercel as a second project pointing 
 
 ## Step 5: Using Android APK or Local App with Your Live Vercel Server
 
-If you also run the app on Android or locally in Chrome and want everyone to sync with your Vercel + MongoDB Atlas server:
+[`Frontend/lib/core/app_constants.dart`](Frontend/lib/core/app_constants.dart) already points `defaultProdBaseUrl` to your Vercel backend, or you can override it during builds:
 
-- **Option A (No rebuild required — Inside the App)**:
-  Open Cricyy → tap the **Cloud Sync / Auto 5s pill** (or banner) on the Dashboard → enter your Vercel Backend URL (e.g. `https://cricyy-backend.vercel.app`) → tap **Save & Sync**.
-- **Option B (Hardcode for APK builds)**:
-  Set `defaultProdBaseUrl` in [`Frontend/lib/core/app_constants.dart`](Frontend/lib/core/app_constants.dart) or build with:
-  ```bash
-  flutter build apk --release --dart-define=API_BASE_URL=https://cricyy-backend.vercel.app/api
-  ```
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=https://cricyy.vercel.app/api
+```
 
 ---
 
-## Multi-User Auto-Refresh & Storage Notes
+## Multi-User Auto-Refresh, Creator Ownership & Storage Notes
 
-- **Multi-User Live Updates**: Every match created or scored is persisted in MongoDB Atlas (`SharedMatch` collection). Other users receive updates automatically every **5 seconds** (`AUTO 5s` indicator in top bar) or anytime via **Manual Refresh** / **Pull-to-Refresh**.
+- **Multi-User Live Updates**: Every match created or scored is persisted in MongoDB Atlas (`SharedMatch` collection). Other users receive updates automatically in the background every **5 seconds** or anytime via standard **Pull-to-Refresh** (swipe down from top).
+- **Creator-Only Match Deletion**: Each match stores a persistent `creatorId` on creation so only the creator who created the match can delete it (enforced in both UI and `/api/shared-matches/:id`).
 - **MongoDB Atlas 512 MB Free Limit**: Each full cricket match snapshot takes only ~3–8 KB in MongoDB Atlas — meaning 512 MB easily holds **50,000+ matches**!

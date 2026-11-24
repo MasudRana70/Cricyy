@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../core/app_constants.dart';
 import '../models/match_model.dart';
 import '../models/innings_model.dart';
+import '../services/api_client.dart';
 import '../services/local_storage_service.dart';
 import '../services/match_api_service.dart';
 
@@ -45,6 +46,7 @@ class MatchProvider extends ChangeNotifier {
   DateTime? _lastSyncedAt;
   String? _error;
   String? _syncError;
+  String? _deviceId;
 
   Timer? _autoRefreshTimer;
   Set<String> _pendingSyncMatchIds = {};
@@ -77,6 +79,13 @@ class MatchProvider extends ChangeNotifier {
   DateTime?         get lastSyncedAt     => _lastSyncedAt;
   String?           get error            => _error;
   String?           get syncError        => _syncError;
+  String?           get deviceId         => _deviceId;
+
+  /// Returns true only when the current device/browser created this match.
+  bool canDeleteMatch(MatchModel? match) {
+    if (match == null || _deviceId == null || _deviceId!.isEmpty) return false;
+    return match.creatorId != null && match.creatorId == _deviceId;
+  }
 
   List<MatchModel> get liveMatches =>
       _matches.where((m) => m.isLive).toList();
@@ -139,7 +148,8 @@ class MatchProvider extends ChangeNotifier {
     _isLoading = true;
     _safeNotify();
 
-    // Load saved custom API URL if present
+    // Load persistent creator device ID and saved custom API URL if present
+    _deviceId = await LocalStorageService.instance.getOrCreateDeviceId();
     final savedApiUrl = await LocalStorageService.instance.loadCustomApiUrl();
     if (savedApiUrl != null && savedApiUrl.isNotEmpty) {
       AppConstants.setCustomBaseUrl(savedApiUrl);
@@ -183,7 +193,10 @@ class MatchProvider extends ChangeNotifier {
       if (toUpload.isNotEmpty) {
         for (final m in toUpload) {
           try {
-            final saved = await _apiService.upsertSharedMatch(m);
+            final saved = await _apiService.upsertSharedMatch(
+              m,
+              deviceId: m.creatorId ?? _deviceId,
+            );
             remoteById[saved.id] = saved;
             _pendingSyncMatchIds.remove(m.id);
           } catch (_) {
@@ -348,8 +361,11 @@ class MatchProvider extends ChangeNotifier {
       thisOverBalls: const [],
     );
 
+    final creatorId = _deviceId ??= LocalStorageService.instance.getOrInitDeviceIdSync();
+
     final newMatch = MatchModel(
       id: matchId,
+      creatorId: creatorId,
       team1Id: 'team_1',
       team2Id: 'team_2',
       team1Name: team1Name,
@@ -917,7 +933,10 @@ class MatchProvider extends ChangeNotifier {
       while (_queuedSyncPayload.containsKey(id) && !_disposed) {
         final payload = _queuedSyncPayload.remove(id)!;
         try {
-          await _apiService.upsertSharedMatch(payload);
+          await _apiService.upsertSharedMatch(
+            payload,
+            deviceId: payload.creatorId ?? _deviceId,
+          );
           _isCloudConnected = true;
           _syncError = null;
           _lastSyncedAt = DateTime.now();
@@ -940,7 +959,36 @@ class MatchProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteMatch(String matchId) async {
+  /// Deletes a match only if this device created it. Returns true if deleted.
+  Future<bool> deleteMatch(String matchId) async {
+    final target = _matches.where((m) => m.id == matchId).firstOrNull;
+    if (!canDeleteMatch(target)) {
+      _error = 'Only the match creator can delete this match';
+      _safeNotify();
+      return false;
+    }
+
+    final creatorId = _deviceId!;
+    if (_allowBackgroundTimers) {
+      try {
+        await _apiService.deleteSharedMatch(matchId, creatorId: creatorId);
+      } on ApiException catch (e) {
+        // 404 means it was never uploaded or already removed on the server
+        if (e.statusCode != 404) {
+          _error = e.message;
+          _safeNotify();
+          return false;
+        }
+      } catch (e) {
+        // Allow removing local-only unsynced drafts offline, otherwise require connection
+        if (!_pendingSyncMatchIds.contains(matchId)) {
+          _error = 'Unable to delete match while offline. Please try again.';
+          _safeNotify();
+          return false;
+        }
+      }
+    }
+
     _matches.removeWhere((m) => m.id == matchId);
     _pendingSyncMatchIds.remove(matchId);
     _queuedSyncPayload.remove(matchId);
@@ -952,12 +1000,8 @@ class MatchProvider extends ChangeNotifier {
     }
     await LocalStorageService.instance.saveMatches(_matches);
     await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+    _error = null;
     _safeNotify();
-
-    if (_allowBackgroundTimers) {
-      try {
-        await _apiService.deleteSharedMatch(matchId);
-      } catch (_) {}
-    }
+    return true;
   }
 }

@@ -68,6 +68,12 @@ const upsertSharedMatch = async (req, res, next) => {
       throw new Error('team1Name and team2Name are required');
     }
 
+    const incomingCreatorId = (
+      req.headers['x-device-id'] ||
+      body.creatorId ||
+      ''
+    ).toString().trim() || null;
+
     const updatePayload = {
       clientMatchId,
       team1Id:    body.team1Id ?? 'team_1',
@@ -90,6 +96,7 @@ const upsertSharedMatch = async (req, res, next) => {
       { clientMatchId },
       {
         $set: updatePayload,
+        $setOnInsert: { creatorId: incomingCreatorId },
         $inc: { syncVersion: 1 },
       },
       {
@@ -114,11 +121,25 @@ const upsertSharedMatch = async (req, res, next) => {
 // DELETE /api/shared-matches/:id
 const deleteSharedMatch = async (req, res, next) => {
   try {
-    const deleted = await SharedMatch.findOneAndDelete({ clientMatchId: req.params.id }).lean();
-    if (!deleted) {
+    const requesterId = (
+      req.headers['x-device-id'] ||
+      req.query.creatorId ||
+      (req.body && req.body.creatorId) ||
+      ''
+    ).toString().trim();
+
+    const doc = await SharedMatch.findOne({ clientMatchId: req.params.id }).lean();
+    if (!doc) {
       res.status(404);
       throw new Error('Shared match not found');
     }
+
+    if (!doc.creatorId || !requesterId || doc.creatorId !== requesterId) {
+      res.status(403);
+      throw new Error('Only the match creator can delete this match');
+    }
+
+    await SharedMatch.deleteOne({ clientMatchId: req.params.id });
     res.json({ success: true, message: 'Shared match deleted' });
   } catch (err) {
     next(err);

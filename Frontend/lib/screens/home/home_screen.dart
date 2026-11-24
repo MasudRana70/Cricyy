@@ -13,7 +13,7 @@ import '../../services/player_stats_aggregator.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/neo_card.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/sync_controls.dart';
+import '../../widgets/match_delete_helper.dart';
 import '../../widgets/player_quick_view_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -174,8 +174,6 @@ class _DashboardTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SyncSummaryBanner(),
-                      AppSpacing.vGap(AppSpacing.md),
                       _LiveMatchSection(),
                       AppSpacing.vGap(AppSpacing.xl),
                       _RecentMatchesSection(),
@@ -224,67 +222,6 @@ class _DashboardTab extends StatelessWidget {
           Text('Cricyy', style: AppTextStyles.headline3.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
         ],
       ),
-      actions: const [
-        Padding(
-          padding: EdgeInsets.only(right: 12),
-          child: SyncActionControls(compact: true),
-        ),
-      ],
-    );
-  }
-}
-
-class _SyncSummaryBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<MatchProvider>(
-      builder: (context, prov, _) {
-        final connected = prov.isCloudConnected;
-        final autoOn = prov.autoRefreshEnabled;
-        final label = connected
-            ? (autoOn
-                ? 'Live Multi-User Sync active • Updates every 5s'
-                : 'Connected to shared server • Manual refresh mode')
-            : 'Offline / Local cache mode • Tap to configure cloud sync';
-
-        return GestureDetector(
-          onTap: () => showSyncSettingsDialog(context),
-          child: NeoCard(
-            style: NeoStyle.inset,
-            borderRadius: 14,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  connected ? Icons.cloud_done_rounded : Icons.cloud_queue_rounded,
-                  size: 16,
-                  color: connected ? AppColors.success : AppColors.warning,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Settings',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -399,6 +336,24 @@ class _LiveMatchCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (context.watch<MatchProvider>().canDeleteMatch(match)) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => confirmAndDeleteMatch(context, match),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -651,8 +606,19 @@ class _CompactMatchCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 20),
+              if (context.watch<MatchProvider>().canDeleteMatch(match))
+                IconButton(
+                  tooltip: 'Delete match',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 19),
+                  onPressed: () => confirmAndDeleteMatch(context, match),
+                )
+              else ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 20),
+              ],
             ],
           ),
           if (inn1 != null || inn2 != null) ...[
@@ -708,12 +674,6 @@ class _HistoryTab extends StatelessWidget {
       backgroundColor: AppColors.neoBackground,
       appBar: AppBar(
         title: const Text('Match History'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: SyncActionControls(compact: true),
-          ),
-        ],
       ),
       body: Consumer<MatchProvider>(
         builder: (context, prov, _) {
@@ -792,12 +752,6 @@ class _PlayersTabState extends State<_PlayersTab> {
       backgroundColor: AppColors.neoBackground,
       appBar: AppBar(
         title: const Text('Players & Statistics'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: SyncActionControls(compact: true),
-          ),
-        ],
       ),
       body: Consumer<PlayerProvider>(
         builder: (context, prov, _) {

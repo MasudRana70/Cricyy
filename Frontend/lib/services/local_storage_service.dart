@@ -1,6 +1,7 @@
 // lib/services/local_storage_service.dart
 
 import 'dart:convert';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/match_model.dart';
 
@@ -8,9 +9,55 @@ class LocalStorageService {
   static const String _keyMatches = 'cricyy_saved_matches';
   static const String _keyApiUrl  = 'cricyy_custom_api_url';
   static const String _keyPendingSync = 'cricyy_pending_sync_ids';
+  static const String _keyDeviceId = 'cricyy_device_id';
+
+  static String? _cachedDeviceId;
 
   LocalStorageService._();
   static final LocalStorageService instance = LocalStorageService._();
+
+  static String _generateDeviceId() {
+    final rand = Random.secure().nextInt(0x3fffffff).toRadixString(36);
+    return 'dev_${DateTime.now().microsecondsSinceEpoch}_$rand';
+  }
+
+  String getOrInitDeviceIdSync() {
+    if (_cachedDeviceId != null) return _cachedDeviceId!;
+    final id = _generateDeviceId();
+    _cachedDeviceId = id;
+    _persistDeviceIdIfAbsent(id);
+    return id;
+  }
+
+  Future<void> _persistDeviceIdIfAbsent(String fallbackId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getString(_keyDeviceId);
+      if (existing != null && existing.trim().isNotEmpty) {
+        _cachedDeviceId = existing.trim();
+      } else {
+        await prefs.setString(_keyDeviceId, fallbackId);
+      }
+    } catch (_) {}
+  }
+
+  Future<String> getOrCreateDeviceId() async {
+    if (_cachedDeviceId != null) return _cachedDeviceId!;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getString(_keyDeviceId);
+      if (existing != null && existing.trim().isNotEmpty) {
+        _cachedDeviceId = existing.trim();
+        return _cachedDeviceId!;
+      }
+      final id = _cachedDeviceId ?? _generateDeviceId();
+      _cachedDeviceId = id;
+      await prefs.setString(_keyDeviceId, id);
+      return id;
+    } catch (_) {
+      return _cachedDeviceId ??= _generateDeviceId();
+    }
+  }
 
   Future<void> saveMatches(List<MatchModel> matches) async {
     try {

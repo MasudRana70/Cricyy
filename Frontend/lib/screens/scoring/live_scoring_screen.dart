@@ -15,7 +15,7 @@ import '../../widgets/neo_card.dart';
 import '../../widgets/score_badge.dart';
 import '../../widgets/player_avatar.dart';
 import '../../widgets/player_quick_view_sheet.dart';
-import '../../widgets/sync_controls.dart';
+import '../../widgets/match_delete_helper.dart';
 
 class LiveScoringScreen extends StatefulWidget {
   const LiveScoringScreen({super.key});
@@ -163,7 +163,21 @@ class _ScoreHeader extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SyncActionControls(darkSurface: true, compact: true),
+                  if (context.watch<MatchProvider>().canDeleteMatch(match))
+                    GestureDetector(
+                      onTap: () async {
+                        final deleted = await confirmAndDeleteMatch(context, match!);
+                        if (deleted && context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 28),
                 ],
               ),
           const SizedBox(height: 14),

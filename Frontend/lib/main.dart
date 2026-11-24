@@ -1,5 +1,6 @@
 // lib/main.dart
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -51,6 +52,7 @@ class CricyyApp extends StatelessWidget {
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        scrollBehavior: const _AppScrollBehavior(),
         initialRoute: AppConstants.routeHome,
         onGenerateRoute: _onGenerateRoute,
       ),
@@ -96,4 +98,17 @@ class CricyyApp extends StatelessWidget {
       transitionDuration: const Duration(milliseconds: 280),
     );
   }
+}
+
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.unknown,
+      };
 }

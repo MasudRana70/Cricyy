@@ -9,7 +9,7 @@ class PlayerProvider extends ChangeNotifier {
   List<PlayerAggregatedProfile> _profiles = [];
   PlayerAggregatedProfile? _selectedProfile;
   String? _selectedPlayerId;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   String _searchQuery = '';
   String _sortBy = 'runs'; // 'runs', 'wickets', 'matches', 'name'
 

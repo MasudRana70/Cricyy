@@ -32,16 +32,27 @@ class MatchApiService {
     return null;
   }
 
-  Future<MatchModel> upsertSharedMatch(MatchModel match) async {
-    final res = await client.put('/shared-matches/${match.id}', body: match.toJson());
+  Future<MatchModel> upsertSharedMatch(MatchModel match, {String? deviceId}) async {
+    final headers = <String, String>{
+      if (deviceId != null && deviceId.isNotEmpty) 'X-Device-Id': deviceId,
+    };
+    final res = await client.put(
+      '/shared-matches/${match.id}',
+      body: match.toJson(),
+      headers: headers.isEmpty ? null : headers,
+    );
     if (res is Map && res['match'] is Map<String, dynamic>) {
       return MatchModel.fromJson(res['match'] as Map<String, dynamic>);
     }
     return match;
   }
 
-  Future<void> deleteSharedMatch(String id) async {
-    await client.delete('/shared-matches/$id');
+  Future<void> deleteSharedMatch(String id, {required String creatorId}) async {
+    await client.delete(
+      '/shared-matches/$id',
+      queryParams: {'creatorId': creatorId},
+      headers: {'X-Device-Id': creatorId},
+    );
   }
 
   Future<Map<String, dynamic>> checkHealth() async {

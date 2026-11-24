@@ -262,8 +262,6 @@ class _PlayerCollector {
     int maidens = 0;
     int runsConceded = 0;
     int wickets = 0;
-    int wides = 0;
-    int noBalls = 0;
     int threeWkts = 0;
     int fourWkts = 0;
     int fiveWkts = 0;

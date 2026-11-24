@@ -18,6 +18,7 @@ const sharedMatchSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    creatorId:  { type: String, default: null, trim: true, index: true },
     team1Id:    { type: String, default: 'team_1' },
     team2Id:    { type: String, default: 'team_2' },
     team1Name:  { type: String, required: true, trim: true },
@@ -50,6 +51,7 @@ sharedMatchSchema.statics.formatForClient = function (doc) {
   const obj = typeof doc.toObject === 'function' ? doc.toObject() : doc;
   return {
     _id:         obj.clientMatchId,
+    creatorId:   obj.creatorId ?? null,
     team1Id:     obj.team1Id ?? 'team_1',
     team2Id:     obj.team2Id ?? 'team_2',
     team1Name:   obj.team1Name ?? '',
