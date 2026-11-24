@@ -179,13 +179,13 @@ class MatchProvider extends ChangeNotifier {
     if (!silent) _safeNotify();
 
     try {
-      // 1. Push any matches awaiting upload (including legacy local-only matches)
+      // 1. Push only local matches/updates awaiting upload (never resurrect server-deleted matches)
       final remoteBefore = await _apiService.fetchSharedMatches();
       final remoteById = {for (final m in remoteBefore) m.id: m};
 
       final toUpload = <MatchModel>[];
       for (final local in _matches) {
-        if (_pendingSyncMatchIds.contains(local.id) || !remoteById.containsKey(local.id)) {
+        if (_pendingSyncMatchIds.contains(local.id)) {
           toUpload.add(local);
         }
       }
@@ -257,6 +257,11 @@ class MatchProvider extends ChangeNotifier {
             _secondInnings = updatedSelected.innings2;
             _currentInnings = updatedSelected.innings2 ?? updatedSelected.innings1;
           }
+        } else {
+          _selectedMatch = _matches.firstOrNull;
+          _firstInnings = _selectedMatch?.innings1;
+          _secondInnings = _selectedMatch?.innings2;
+          _currentInnings = _selectedMatch?.innings2 ?? _selectedMatch?.innings1;
         }
       }
 
@@ -933,7 +938,7 @@ class MatchProvider extends ChangeNotifier {
       while (_queuedSyncPayload.containsKey(id) && !_disposed) {
         final payload = _queuedSyncPayload.remove(id)!;
         try {
-          await _apiService.upsertSharedMatch(
+          final saved = await _apiService.upsertSharedMatch(
             payload,
             deviceId: payload.creatorId ?? _deviceId,
           );
@@ -944,6 +949,17 @@ class MatchProvider extends ChangeNotifier {
           if (!_queuedSyncPayload.containsKey(id)) {
             _pendingSyncMatchIds.remove(id);
             await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+            final idx = _matches.indexWhere((m) => m.id == id);
+            if (idx != -1) {
+              _matches[idx] = _matches[idx].copyWith(
+                updatedAt: saved.updatedAt,
+                syncVersion: saved.syncVersion,
+              );
+              if (_selectedMatch?.id == id) {
+                _selectedMatch = _matches[idx];
+              }
+              await LocalStorageService.instance.saveMatches(_matches);
+            }
           }
           _safeNotify();
         } catch (e) {
