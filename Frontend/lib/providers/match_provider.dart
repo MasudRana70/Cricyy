@@ -1,6 +1,7 @@
 // lib/providers/match_provider.dart
 
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/widgets.dart';
 import '../core/app_constants.dart';
 import '../models/match_model.dart';
@@ -82,10 +83,13 @@ class MatchProvider extends ChangeNotifier {
   String?           get deviceId         => _deviceId;
 
   /// Returns true only when the current device/browser created this match.
-  bool canDeleteMatch(MatchModel? match) {
+  bool isMatchCreator(MatchModel? match) {
     if (match == null || _deviceId == null || _deviceId!.isEmpty) return false;
     return match.creatorId != null && match.creatorId == _deviceId;
   }
+
+  bool canEditMatch(MatchModel? match) => isMatchCreator(match);
+  bool canDeleteMatch(MatchModel? match) => isMatchCreator(match);
 
   List<MatchModel> get liveMatches =>
       _matches.where((m) => m.isLive).toList();
@@ -184,10 +188,19 @@ class MatchProvider extends ChangeNotifier {
       final remoteById = {for (final m in remoteBefore) m.id: m};
 
       final toUpload = <MatchModel>[];
+      final unauthorizedPending = <String>[];
       for (final local in _matches) {
         if (_pendingSyncMatchIds.contains(local.id)) {
-          toUpload.add(local);
+          if (canEditMatch(local)) {
+            toUpload.add(local);
+          } else {
+            unauthorizedPending.add(local.id);
+          }
         }
+      }
+      if (unauthorizedPending.isNotEmpty) {
+        _pendingSyncMatchIds.removeAll(unauthorizedPending);
+        await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
       }
 
       if (toUpload.isNotEmpty) {
@@ -199,6 +212,10 @@ class MatchProvider extends ChangeNotifier {
             );
             remoteById[saved.id] = saved;
             _pendingSyncMatchIds.remove(m.id);
+          } on ApiException catch (e) {
+            if (e.statusCode == 403) {
+              _pendingSyncMatchIds.remove(m.id);
+            }
           } catch (_) {
             // Keep pending for retry
           }
@@ -300,7 +317,8 @@ class MatchProvider extends ChangeNotifier {
     required String nonStrikerName,
     required String openingBowlerName,
   }) {
-    final matchId = 'match_${DateTime.now().millisecondsSinceEpoch}';
+    final randSuffix = Random.secure().nextInt(99999).toString().padLeft(5, '0');
+    final matchId = 'match_${DateTime.now().millisecondsSinceEpoch}_$randSuffix';
 
     // Determine Batting and Bowling Teams based on Toss
     final String battingTeam = (tossDecision == 'bat')
@@ -410,7 +428,11 @@ class MatchProvider extends ChangeNotifier {
 
   // ── Side Change / Swap Strike Manually ────────────────────────────────────
   void swapStrike() {
-    if (_currentInnings == null || _currentInnings!.currentBatters.length < 2) return;
+    if (_currentInnings == null ||
+        !canEditMatch(_selectedMatch) ||
+        _currentInnings!.currentBatters.length < 2) {
+      return;
+    }
 
     final updatedBatters = _currentInnings!.currentBatters.map((b) {
       return b.copyWith(isStriker: !b.isStriker);
@@ -433,7 +455,9 @@ class MatchProvider extends ChangeNotifier {
     String? newBatterName,
     bool outIsStriker = true,
   }) {
-    if (_currentInnings == null) return const BallResult();
+    if (_currentInnings == null || !canEditMatch(_selectedMatch)) {
+      return const BallResult();
+    }
 
     // 1. Push snapshot to undo stack
     _undoStack.add(_currentInnings!);
@@ -716,7 +740,11 @@ class MatchProvider extends ChangeNotifier {
 
   // ── Set New Bowler ─────────────────────────────────────────────────────────
   void setNextBowler(String bowlerName) {
-    if (_currentInnings == null || bowlerName.trim().isEmpty) return;
+    if (_currentInnings == null ||
+        !canEditMatch(_selectedMatch) ||
+        bowlerName.trim().isEmpty) {
+      return;
+    }
 
     final trimmed = bowlerName.trim();
     final bowlers = List<BowlerState>.from(_currentInnings!.bowlersUsed);
@@ -755,7 +783,11 @@ class MatchProvider extends ChangeNotifier {
     required String nonStrikerName,
     required String openingBowlerName,
   }) {
-    if (_selectedMatch == null || _firstInnings == null) return;
+    if (_selectedMatch == null ||
+        _firstInnings == null ||
+        !canEditMatch(_selectedMatch)) {
+      return;
+    }
 
     final match = _selectedMatch!;
     final target = _firstInnings!.totalRuns + 1;
@@ -833,7 +865,7 @@ class MatchProvider extends ChangeNotifier {
 
   // ── Undo Last Ball ─────────────────────────────────────────────────────────
   void undoBall() {
-    if (_undoStack.isEmpty) return;
+    if (_undoStack.isEmpty || !canEditMatch(_selectedMatch)) return;
     _currentInnings = _undoStack.removeLast();
 
     if (_currentInnings!.inningsNumber == 1) {
@@ -962,6 +994,15 @@ class MatchProvider extends ChangeNotifier {
             }
           }
           _safeNotify();
+        } on ApiException catch (e) {
+          if (e.statusCode == 403) {
+            _pendingSyncMatchIds.remove(id);
+            await LocalStorageService.instance.savePendingSyncIds(_pendingSyncMatchIds);
+          }
+          _isCloudConnected = true;
+          _syncError = e.message;
+          _safeNotify();
+          break;
         } catch (e) {
           // Leave in _pendingSyncMatchIds so next auto/manual refresh retries
           _isCloudConnected = false;

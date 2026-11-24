@@ -49,7 +49,9 @@ describe('sharedMatchController – creator ownership', () => {
     jest.clearAllMocks();
   });
 
-  test('upsertSharedMatch sets creatorId only on insert ($setOnInsert)', async () => {
+  test('upsertSharedMatch creates new match and sets creatorId via $setOnInsert', async () => {
+    SharedMatch.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+
     const req = {
       method: 'PUT',
       params: { id: 'match_123' },
@@ -81,6 +83,100 @@ describe('sharedMatchController – creator ownership', () => {
     expect(updateDoc.$set.creatorId).toBeUndefined();
     expect(res.statusCode).toBe(200);
     expect(res.body.match.creatorId).toBe('dev_creator_1');
+  });
+
+  test('upsertSharedMatch returns 403 when non-creator attempts to update an existing match', async () => {
+    SharedMatch.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        clientMatchId: 'match_123',
+        creatorId: 'dev_creator_1',
+      }),
+    });
+
+    const req = {
+      method: 'PUT',
+      params: { id: 'match_123' },
+      headers: { 'x-device-id': 'dev_spectator' },
+      body: {
+        team1Name: 'Tigers',
+        team2Name: 'Lions',
+        totalOvers: 10,
+      },
+    };
+    const res = createMockRes();
+    const next = jest.fn();
+
+    await ctrl.upsertSharedMatch(req, res, next);
+
+    expect(res.statusCode).toBe(403);
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Only the match creator can update this match' })
+    );
+    expect(SharedMatch.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  test('upsertSharedMatch returns 403 when updating legacy match with null creatorId', async () => {
+    SharedMatch.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        clientMatchId: 'legacy_match',
+        creatorId: null,
+      }),
+    });
+
+    const req = {
+      method: 'PUT',
+      params: { id: 'legacy_match' },
+      headers: { 'x-device-id': 'dev_someone' },
+      body: {
+        team1Name: 'A',
+        team2Name: 'B',
+        totalOvers: 10,
+      },
+    };
+    const res = createMockRes();
+    const next = jest.fn();
+
+    await ctrl.upsertSharedMatch(req, res, next);
+
+    expect(res.statusCode).toBe(403);
+    expect(SharedMatch.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  test('upsertSharedMatch allows creator to update their existing match', async () => {
+    SharedMatch.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        clientMatchId: 'match_123',
+        creatorId: 'dev_creator_1',
+      }),
+    });
+    SharedMatch.findOneAndUpdate.mockResolvedValue({
+      clientMatchId: 'match_123',
+      creatorId: 'dev_creator_1',
+      team1Name: 'Tigers',
+      team2Name: 'Lions',
+      totalOvers: 10,
+      syncVersion: 2,
+    });
+
+    const req = {
+      method: 'PUT',
+      params: { id: 'match_123' },
+      headers: { 'x-device-id': 'dev_creator_1' },
+      body: {
+        team1Name: 'Tigers',
+        team2Name: 'Lions',
+        totalOvers: 10,
+      },
+    };
+    const res = createMockRes();
+    const next = jest.fn();
+
+    await ctrl.upsertSharedMatch(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(SharedMatch.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.match.syncVersion).toBe(2);
   });
 
   test('deleteSharedMatch returns 404 when match does not exist', async () => {

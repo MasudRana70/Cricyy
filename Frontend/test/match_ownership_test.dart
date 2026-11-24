@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cricyy/models/innings_model.dart';
 import 'package:cricyy/models/match_model.dart';
 import 'package:cricyy/providers/match_provider.dart';
 import 'package:cricyy/services/match_api_service.dart';
@@ -127,5 +128,78 @@ void main() {
     await prov.refreshMatches(silent: true);
     expect(fakeApi.upsertCount, 0);
     expect(prov.matches, isEmpty);
+  });
+
+  test('Non-creator cannot score, swap strike, change bowler, or start 2nd innings', () async {
+    final otherInnings = InningsModel(
+      id: 'inn_other_1',
+      matchId: 'match_other_live',
+      inningsNumber: 1,
+      battingTeamId: 't1',
+      battingTeamName: 'Team A',
+      bowlingTeamId: 't2',
+      bowlingTeamName: 'Team B',
+      totalRuns: 10,
+      totalWickets: 0,
+      completedOvers: 1,
+      currentBallInOver: 0,
+      totalLegalBalls: 6,
+      extras: const ExtrasBreakdown(wides: 0, noBalls: 0, byes: 0, legByes: 0, penalty: 0, total: 0),
+      status: 'in_progress',
+      currentBatters: const [
+        BatterState(playerId: 'b1', playerName: 'Ali', runs: 6, balls: 3, fours: 1, sixes: 0, isOut: false, isStriker: true),
+        BatterState(playerId: 'b2', playerName: 'Sara', runs: 4, balls: 3, fours: 1, sixes: 0, isOut: false, isStriker: false),
+      ],
+      battersUsed: const [
+        BatterState(playerId: 'b1', playerName: 'Ali', runs: 6, balls: 3, fours: 1, sixes: 0, isOut: false, isStriker: true),
+        BatterState(playerId: 'b2', playerName: 'Sara', runs: 4, balls: 3, fours: 1, sixes: 0, isOut: false, isStriker: false),
+      ],
+      bowlersUsed: const [
+        BowlerState(playerId: 'bw1', playerName: 'Zain', overs: 1, balls: 0, maidens: 0, runs: 10, wickets: 0, wides: 0, noBalls: 0, isCurrent: true),
+      ],
+      fallOfWickets: const [],
+    );
+
+    final otherLiveMatch = MatchModel(
+      id: 'match_other_live',
+      creatorId: 'dev_someone_else',
+      team1Id: 't1',
+      team2Id: 't2',
+      team1Name: 'Team A',
+      team2Name: 'Team B',
+      format: 'T10',
+      totalOvers: 10,
+      status: 'in_progress',
+      matchDate: DateTime.now(),
+      rules: const MatchRules(
+        ruleset: 'MCC_2026',
+        maxOversPerBowler: 0,
+        playersPerSide: 11,
+        overLength: 6,
+      ),
+      innings1: otherInnings,
+    );
+
+    SharedPreferences.setMockInitialValues({
+      'cricyy_saved_matches': jsonEncode([otherLiveMatch.toJson()]),
+    });
+
+    final prov = MatchProvider(enableAutoRefresh: false);
+    await prov.loadMatches();
+
+    expect(prov.selectedMatch?.id, 'match_other_live');
+    expect(prov.canEditMatch(prov.selectedMatch), isFalse);
+    expect(prov.canDeleteMatch(prov.selectedMatch), isFalse);
+
+    prov.recordBall(runs: 6, extraType: 'none');
+    prov.swapStrike();
+    prov.setNextBowler('Unauthorized Bowler');
+    prov.startSecondInnings(strikerName: 'X', nonStrikerName: 'Y', openingBowlerName: 'Z');
+    prov.undoBall();
+
+    expect(prov.currentInnings?.totalRuns, 10);
+    expect(prov.currentInnings?.striker?.playerName, 'Ali');
+    expect(prov.currentInnings?.currentBowler?.playerName, 'Zain');
+    expect(prov.secondInnings, isNull);
   });
 }

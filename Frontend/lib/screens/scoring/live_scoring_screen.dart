@@ -75,6 +75,8 @@ class _LiveScoringScreenState extends State<LiveScoringScreen> {
             );
           }
           final innings = prov.currentInnings!;
+          final canEdit = prov.canEditMatch(prov.selectedMatch) &&
+              !(prov.selectedMatch?.isCompleted ?? false);
           return Column(
             children: [
               _ScoreHeader(innings: innings),
@@ -90,9 +92,9 @@ class _LiveScoringScreenState extends State<LiveScoringScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
                         child: Column(
                           children: [
-                            _CurrentPlayersCard(innings: innings),
+                            _CurrentPlayersCard(innings: innings, canEdit: canEdit),
                             AppSpacing.vGap(AppSpacing.md),
-                            _ScoringPanel(innings: innings),
+                            _ScoringPanel(innings: innings, canEdit: canEdit),
                           ],
                         ),
                       ),
@@ -177,7 +179,29 @@ class _ScoreHeader extends StatelessWidget {
                       ),
                     )
                   else
-                    const SizedBox(width: 28),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        borderRadius: AppRadius.rFull,
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.visibility_outlined, size: 12, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            'VIEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
           const SizedBox(height: 14),
@@ -316,7 +340,8 @@ class _OverProgressBar extends StatelessWidget {
 // ── Current Players Card (Batters & Bowler) ──────────────────────────────────
 class _CurrentPlayersCard extends StatelessWidget {
   final InningsModel innings;
-  const _CurrentPlayersCard({required this.innings});
+  final bool canEdit;
+  const _CurrentPlayersCard({required this.innings, required this.canEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -328,7 +353,7 @@ class _CurrentPlayersCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          // Header with Side Change / Swap Strike Button
+          // Header with Side Change / Swap Strike Button (Creator Only)
           Row(
             children: [
               Text(
@@ -339,41 +364,41 @@ class _CurrentPlayersCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // Prominent Side Change / Swap Strike Button as requested
-              InkWell(
-                onTap: () {
-                  context.read<MatchProvider>().swapStrike();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Strike swapped! (Side change applied)'),
-                      duration: Duration(milliseconds: 900),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.15),
-                    borderRadius: AppRadius.rFull,
-                    border: Border.all(color: AppColors.accent),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.swap_horiz, size: 16, color: AppColors.accent),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Side Change / Swap Strike',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w700,
-                        ),
+              if (canEdit)
+                InkWell(
+                  onTap: () {
+                    context.read<MatchProvider>().swapStrike();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Strike swapped! (Side change applied)'),
+                        duration: Duration(milliseconds: 900),
                       ),
-                    ],
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: AppRadius.rFull,
+                      border: Border.all(color: AppColors.accent),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.swap_horiz, size: 16, color: AppColors.accent),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Side Change / Swap Strike',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -395,20 +420,21 @@ class _CurrentPlayersCard extends StatelessWidget {
           ),
           Divider(height: 20, color: AppColors.borderLight),
 
-          // Bowler with Change Bowler Action
+          // Bowler with Change Bowler Action (Creator Only)
           Row(
             children: [
               if (bowler != null)
                 Expanded(child: _BowlerInfo(bowler: bowler)),
-              TextButton.icon(
-                onPressed: () => _showChangeBowlerDialog(context),
-                icon: const Icon(Icons.edit, size: 14),
-                label: const Text('Change Bowler'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+              if (canEdit)
+                TextButton.icon(
+                  onPressed: () => _showChangeBowlerDialog(context),
+                  icon: const Icon(Icons.edit, size: 14),
+                  label: const Text('Change Bowler'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -591,7 +617,8 @@ class _BowlerInfo extends StatelessWidget {
 // ── Scoring Panel ─────────────────────────────────────────────────────────────
 class _ScoringPanel extends StatefulWidget {
   final InningsModel innings;
-  const _ScoringPanel({required this.innings});
+  final bool canEdit;
+  const _ScoringPanel({required this.innings, required this.canEdit});
 
   @override
   State<_ScoringPanel> createState() => _ScoringPanelState();
@@ -914,6 +941,69 @@ class _ScoringPanelState extends State<_ScoringPanel> {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<MatchProvider>();
+    final isCompleted = prov.selectedMatch?.isCompleted ?? false;
+
+    if (!widget.canEdit) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _LastBallsRow(balls: widget.innings.thisOverBalls),
+          AppSpacing.vGap(AppSpacing.md),
+          AppCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    NeoCard(
+                      style: NeoStyle.inset,
+                      borderRadius: 100,
+                      padding: const EdgeInsets.all(10),
+                      child: Icon(
+                        isCompleted ? Icons.emoji_events_rounded : Icons.live_tv_rounded,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isCompleted ? 'Match Completed' : 'Live Spectator Mode',
+                            style: AppTextStyles.bodyBold,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isCompleted
+                                ? 'Final scorecard is ready below.'
+                                : 'Only the match creator can update scores. Auto-refreshes live every 5s, or pull down to refresh.',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, AppConstants.routeScorecard),
+                    icon: const Icon(Icons.table_rows_outlined, size: 18),
+                    label: Text('Full Scorecard', style: AppTextStyles.button),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

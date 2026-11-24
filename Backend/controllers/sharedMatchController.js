@@ -74,6 +74,14 @@ const upsertSharedMatch = async (req, res, next) => {
       ''
     ).toString().trim() || null;
 
+    const existing = await SharedMatch.findOne({ clientMatchId }).lean();
+    if (existing) {
+      if (!existing.creatorId || !incomingCreatorId || existing.creatorId !== incomingCreatorId) {
+        res.status(403);
+        throw new Error('Only the match creator can update this match');
+      }
+    }
+
     const updatePayload = {
       clientMatchId,
       team1Id:    body.team1Id ?? 'team_1',

@@ -199,24 +199,21 @@ class _DashboardTab extends StatelessWidget {
       title: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: const Color(0xFFF7F8FA),
               borderRadius: BorderRadius.circular(11),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.30),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10,
-                ),
-              ],
+              border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 1.5),
+              boxShadow: NeoCard.raisedShadows(blur: 8, offset: 3),
             ),
-            child: const Icon(Icons.sports_cricket_rounded, color: Colors.white, size: 19),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/Cricyy.jpeg',
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
           AppSpacing.hGap(AppSpacing.sm),
           Text('Cricyy', style: AppTextStyles.headline3.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
@@ -351,6 +348,26 @@ class _LiveMatchCard extends StatelessWidget {
                         size: 15,
                         color: Colors.white,
                       ),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.visibility_outlined, size: 11, color: Colors.white70),
+                        SizedBox(width: 3),
+                        Text(
+                          'Live View',
+                          style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
                 ],
